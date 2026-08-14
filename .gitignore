@@ -1,0 +1,19 @@
+# SSMS user / session files
+*.ssmssqlproj.user
+*.sql.user
+*.suo
+.vs/
+
+# Backup & scratch
+*.bak
+*.tmp
+*.log
+
+# Raw source datasets (kept local, not in repo)
+documents/
+HiLyst*/
+*.csv.orig
+
+# OS
+Thumbs.db
+.DS_Store

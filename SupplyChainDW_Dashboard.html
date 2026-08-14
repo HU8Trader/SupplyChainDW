@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SupplyChainDW · Command Center</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root{
+  --bg:#06090a; --bg2:#0a0f11; --panel:#0e1416; --panel2:#121a1d; --line:#1c2629;
+  --line2:#223034;
+  --txt:#eaf2ee; --txt2:#9fb4ab; --txt3:#64776f;
+  --green:#00e58c; --green2:#00ffa3; --green3:#0c5c3f; --greenDim:rgba(0,229,140,.12);
+  --amber:#ffb454; --red:#ff6b6b; --blue:#4dd0ff; --purple:#b388ff;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+  --radius:16px; --radius-sm:10px;
+  --sidebar-w:232px;
+  --font:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font); background:var(--bg); color:var(--txt);
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(1200px 500px at 85% -10%, rgba(0,229,140,.05), transparent 60%),
+    radial-gradient(800px 400px at -10% 110%, rgba(0,229,140,.04), transparent 60%);
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#1f2c30;border-radius:20px}
+::-webkit-scrollbar-track{background:transparent}
+::selection{background:rgba(0,229,140,.25)}
+button{font-family:inherit}
+svg{display:block}
+
+/* ============ LAYOUT ============ */
+.app{display:flex;height:100vh}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.content{flex:1;overflow-y:auto;padding:22px 26px 40px;scroll-behavior:smooth}
+
+/* ============ SIDEBAR ============ */
+.sidebar{
+  width:var(--sidebar-w); flex-shrink:0; background:linear-gradient(180deg,var(--bg2),#070b0c);
+  border-right:1px solid var(--line); display:flex; flex-direction:column; padding:18px 14px;
+  position:relative; z-index:20;
+}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 18px;border-bottom:1px solid var(--line)}
+.brand-logo{
+  width:34px;height:34px;border-radius:10px;position:relative;flex-shrink:0;
+  background:linear-gradient(135deg,var(--green),#00b96f);
+  box-shadow:0 0 22px rgba(0,229,140,.5), inset 0 1px 0 rgba(255,255,255,.35);
+  display:flex;align-items:center;justify-content:center;
+}
+.brand-name{font-size:13.5px;font-weight:700;letter-spacing:.2px}
+.brand-sub{font-size:10px;color:var(--txt3);font-weight:500;letter-spacing:.5px;margin-top:2px}
+.nav{flex:1;overflow-y:auto;margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.nav-label{font-size:9.5px;font-weight:700;letter-spacing:1.4px;color:var(--txt3);text-transform:uppercase;padding:10px 10px 6px}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;cursor:pointer;
+  color:var(--txt2);font-size:13px;font-weight:500;position:relative;transition:all .18s;border:1px solid transparent;
+  user-select:none;
+}
+.nav-item:hover{color:var(--txt);background:rgba(255,255,255,.03)}
+.nav-item.active{
+  color:#fff;background:linear-gradient(135deg,rgba(0,229,140,.16),rgba(0,229,140,.05));
+  border-color:rgba(0,229,140,.28);
+}
+.nav-item.active::before{content:'';position:absolute;left:-14px;top:20%;bottom:20%;width:3px;border-radius:0 4px 4px 0;background:var(--green);box-shadow:0 0 12px var(--green)}
+.nav-item svg{width:18px;height:18px;flex-shrink:0;color:currentColor}
+.nav-item .badge{margin-left:auto;font-size:10px;background:var(--greenDim);color:var(--green2);padding:2px 7px;border-radius:20px;font-weight:600}
+.sidebar-foot{border-top:1px solid var(--line);padding-top:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.sidebar-foot .row{display:flex;align-items:center;gap:9px;padding:6px 10px;font-size:11px;color:var(--txt3)}
+
+/* ============ TOPBAR ============ */
+.topbar{
+  height:60px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 26px;
+  border-bottom:1px solid var(--line);background:rgba(8,12,14,.72);backdrop-filter:blur(18px);position:sticky;top:0;z-index:15;
+}
+.page-title h1{font-size:16px;font-weight:700;letter-spacing:.1px}
+.page-title p{font-size:11px;color:var(--txt3);margin-top:2px}
+.topbar-spacer{flex:1}
+.tb-btn{
+  display:flex;align-items:center;gap:8px;height:36px;padding:0 13px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt2);cursor:pointer;font-size:12.5px;font-weight:500;
+  transition:all .18s;position:relative;
+}
+.tb-btn:hover{color:var(--txt);border-color:var(--line2);transform:translateY(-1px)}
+.tb-btn svg{width:16px;height:16px}
+.tb-btn.primary{background:linear-gradient(135deg,var(--green),#00bd70);color:#04150d;border:none;font-weight:700;box-shadow:0 0 18px rgba(0,229,140,.35)}
+.tb-btn.primary:hover{box-shadow:0 0 26px rgba(0,229,140,.55);transform:translateY(-1px)}
+.clock{display:flex;flex-direction:column;align-items:flex-end;padding:0 4px}
+.clock-time{font-size:15px;font-weight:700;letter-spacing:.3px;font-variant-numeric:tabular-nums}
+.clock-date{font-size:10px;color:var(--txt3);margin-top:1px}
+.avatar{
+  width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#143a2b,#0d2420);border:1px solid rgba(0,229,140,.4);color:var(--green2);font-weight:700;font-size:13px;
+  position:relative;transition:all .18s;
+}
+.avatar:hover{box-shadow:0 0 16px rgba(0,229,140,.4)}
+.dropdown{
+  position:absolute;top:46px;right:0;min-width:210px;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;
+  box-shadow:var(--shadow);padding:8px;opacity:0;pointer-events:none;transform:translateY(-6px);transition:all .18s;z-index:60;
+}
+.dropdown.open{opacity:1;pointer-events:auto;transform:translateY(0)}
+.dropdown .dd-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:12.5px;color:var(--txt2);cursor:pointer}
+.dropdown .dd-item:hover{background:rgba(255,255,255,.04);color:var(--txt)}
+.dropdown .dd-item svg{width:15px;height:15px}
+.dropdown .dd-sep{height:1px;background:var(--line);margin:6px 4px}
+.dropdown .dd-head{font-size:10px;color:var(--txt3);padding:6px 10px 2px;letter-spacing:.5px;text-transform:uppercase;font-weight:700}
+
+/* ============ HOME HERO ============ */
+.home-hero{
+  position:relative;border-radius:20px;padding:34px 36px;overflow:hidden;margin-bottom:22px;
+  background:linear-gradient(120deg,#0c1a15 0%,#0a1215 55%,#0d1713 100%);
+  border:1px solid var(--line);
+}
+.home-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(700px 240px at 12% -20%, rgba(0,229,140,.22), transparent 60%), radial-gradient(500px 200px at 95% 120%, rgba(0,229,140,.12), transparent 60%);}
+.home-hero .inner{position:relative;z-index:2}
+.home-hero .kicker{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--green2);text-transform:uppercase}
+.home-hero h1{font-size:30px;font-weight:800;letter-spacing:-.5px;margin:8px 0 8px}
+.home-hero h1 span{background:linear-gradient(90deg,#fff,#9fe8c8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.home-hero p{font-size:13.5px;color:var(--txt2);max-width:560px;line-height:1.6}
+.hero-cta{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}
+
+/* ============ PAGE HEADER ============ */
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;margin:6px 2px 18px}
+.page-head h2{font-size:19px;font-weight:750;letter-spacing:-.2px}
+.page-head .sub{font-size:12px;color:var(--txt3);margin-top:3px}
+.page-head .actions{display:flex;gap:10px;align-items:center}
+
+/* ============ SLICERS ============ */
+.slicer-bar{
+  display:flex;flex-wrap:wrap;gap:10px;padding:12px;border-radius:var(--radius);background:var(--panel);
+  border:1px solid var(--line);margin-bottom:20px;align-items:center;position:relative;
+}
+.slicer{display:flex;flex-direction:column;gap:6px}
+.slicer .sl-label{font-size:9.5px;font-weight:700;letter-spacing:1.1px;color:var(--txt3);text-transform:uppercase}
+.sl-chips{display:flex;gap:6px;flex-wrap:wrap;max-width:560px}
+.sl-chip{
+  padding:6px 12px;border-radius:20px;font-size:11.5px;font-weight:600;cursor:pointer;
+  background:var(--bg2);border:1px solid var(--line);color:var(--txt2);transition:all .16s;user-select:none;
+  display:flex;align-items:center;gap:6px;
+}
+.sl-chip:hover{border-color:var(--line2);color:var(--txt)}
+.sl-chip.on{background:var(--greenDim);border-color:rgba(0,229,140,.5);color:var(--green2)}
+.sl-chip .x{font-size:12px;opacity:.6}
+.clear-slicers{
+  display:flex;align-items:center;gap:7px;margin-left:auto;padding:8px 13px;border-radius:10px;
+  background:transparent;border:1px dashed var(--line2);color:var(--txt3);font-size:11.5px;font-weight:600;cursor:pointer;transition:all .16s;
+}
+.clear-slicers:hover{color:var(--red);border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.06)}
+.clear-slicers svg{width:13px;height:13px}
+
+/* ============ KPI CARDS ============ */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px;margin-bottom:22px}
+.kpi{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px;
+  position:relative;overflow:hidden;transition:transform .18s,border-color .18s;
+}
+.kpi:hover{transform:translateY(-2px);border-color:var(--line2)}
+.kpi .k-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.kpi .k-ico svg{width:17px;height:17px}
+.kpi .k-label{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--txt3);text-transform:uppercase}
+.kpi .k-value{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-top:5px;font-variant-numeric:tabular-nums}
+.kpi .k-delta{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;margin-top:6px}
+.kpi .k-delta.up{color:var(--green2)} .kpi .k-delta.down{color:var(--red)}
+.kpi .k-bar{position:absolute;bottom:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,var(--green3),var(--green2))}
+.kpi.glow{border-color:rgba(0,229,140,.35);box-shadow:0 0 26px rgba(0,229,140,.08)}
+
+/* ============ PANELS / GRID ============ */
+.grid{display:grid;gap:18px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:1fr 1fr 1fr}
+.grid-2-1{grid-template-columns:2fr 1fr}
+.grid-1-2{grid-template-columns:1fr 2fr}
+.grid-3-2{grid-template-columns:3fr 2fr}
+.grid-2-3{grid-template-columns:2fr 3fr}
+@media(max-width:1180px){.grid-2,.grid-3,.grid-2-1,.grid-1-2,.grid-3-2,.grid-2-3{grid-template-columns:1fr}}
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 19px;
+  position:relative;transition:border-color .18s;
+}
+.panel:hover{border-color:var(--line2)}
+.panel .p-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.panel .p-title{font-size:13px;font-weight:700;letter-spacing:.2px}
+.panel .p-sub{font-size:10.5px;color:var(--txt3);margin-top:2px;font-weight:500}
+.panel .p-ico{width:30px;height:30px;border-radius:9px;background:var(--greenDim);display:flex;align-items:center;justify-content:center}
+.panel .p-ico svg{width:15px;height:15px;color:var(--green2)}
+.chart-box{position:relative;height:250px}
+.chart-box.tall{height:320px}
+.chart-box.short{height:210px}
+
+/* ============ MATRIX TABLE ============ */
+.matrix-wrap{overflow:auto;max-height:430px;border-radius:var(--radius-sm);border:1px solid var(--line)}
+table.matrix{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;min-width:640px}
+table.matrix thead th{
+  position:sticky;top:0;background:#111a1c;padding:11px 12px;font-size:10.5px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--txt2);border-bottom:1px solid var(--line2);text-align:right;z-index:2;
+}
+table.matrix thead th:first-child{text-align:left;z-index:3}
+table.matrix tbody td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;color:var(--txt)}
+table.matrix tbody td:first-child{text-align:left;font-weight:600;color:var(--txt2);position:sticky;left:0;background:var(--panel)}
+table.matrix tbody tr:hover td{background:rgba(255,255,255,.02)}
+table.matrix tbody td.cf{color:#0a1410;font-weight:700;border-radius:6px;transition:filter .15s}
+table.matrix tbody td.cf:hover{filter:brightness(1.18)}
+table.matrix tfoot td{font-weight:800;padding:11px 12px;border-top:1px solid var(--line2);background:#101a1c;text-align:right}
+table.matrix tfoot td:first-child{text-align:left;color:var(--txt)}
+.legend{display:flex;align-items:center;gap:12px;font-size:10.5px;color:var(--txt3);flex-wrap:wrap}
+.legend .lg{display:flex;align-items:center;gap:5px}
+.legend .swatch{width:12px;height:12px;border-radius:4px}
+
+/* ============ RANK LISTS ============ */
+.rank{display:flex;flex-direction:column;gap:2px}
+.rank-item{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:9px;transition:background .15s}
+.rank-item:hover{background:rgba(255,255,255,.03)}
+.rank-num{width:24px;height:24px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--txt3);flex-shrink:0}
+.rank-item:nth-child(-n+3) .rank-num{color:var(--green2);border-color:rgba(0,229,140,.4);background:var(--greenDim)}
+.rank-name{flex:1;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-val{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.rank-bar{height:5px;border-radius:4px;background:linear-gradient(90deg,var(--green3),var(--green2));flex:0 0 70px}
+.rank-bar i{display:block;height:100%;border-radius:4px;background:var(--greenDim);}
+
+/* ============ MISC ============ */
+.page{display:none;animation:fadeUp .35s ease}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.chip-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:10.5px;font-weight:700;background:var(--bg2);border:1px solid var(--line);color:var(--txt2)}
+.chip-tag.green{background:var(--greenDim);border-color:rgba(0,229,140,.4);color:var(--green2)}
+.chip-tag.amber{background:rgba(255,180,84,.1);border-color:rgba(255,180,84,.35);color:var(--amber)}
+.chip-tag.red{background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.35);color:var(--red)}
+.home-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.home-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;cursor:pointer;
+  transition:all .2s;position:relative;overflow:hidden;
+}
+.home-card:hover{transform:translateY(-3px);border-color:rgba(0,229,140,.35);box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.home-card .hc-ico{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(0,229,140,.2),rgba(0,229,140,.05));display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.home-card .hc-ico svg{width:19px;height:19px;color:var(--green2)}
+.home-card h3{font-size:14px;font-weight:700}
+.home-card p{font-size:11.5px;color:var(--txt3);margin-top:5px;line-height:1.5}
+.home-card .hc-go{position:absolute;top:20px;right:20px;color:var(--txt3);opacity:0;transition:all .2s}
+.home-card:hover .hc-go{opacity:1;color:var(--green2)}
+.empty-note{text-align:center;color:var(--txt3);font-size:12px;padding:30px 10px;font-style:italic}
+.foot-note{text-align:center;color:var(--txt3);font-size:10.5px;padding:26px 0 6px;letter-spacing:.4px}
+.badge-pill{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px}
+.badge-pill.on{background:var(--greenDim);color:var(--green2)}
+.badge-pill.off{background:rgba(255,255,255,.05);color:var(--txt3)}
+.bookmark-list{max-height:320px;overflow-y:auto}
+.slicer-bar{display:flex;align-items:flex-start;gap:22px;padding:14px 24px;background:rgba(10,18,20,.6);border-bottom:1px solid var(--line);flex-wrap:wrap;position:relative;z-index:5}
+.sl-group{display:flex;flex-direction:column;gap:7px;min-width:0}
+.sl-label{font-size:9.5px;font-weight:800;letter-spacing:1.4px;color:var(--txt3);text-transform:uppercase}
+.sl-clear{margin-left:auto;align-self:center;color:var(--txt3)}
+.sl-clear:hover{color:var(--red);border-color:rgba(255,107,107,.4)}
+.matrix-table{border-collapse:separate;border-spacing:0;width:100%;min-width:720px;font-size:12px}
+.matrix-table th{position:sticky;top:0;background:#0d1517;color:var(--txt2);font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:11px 12px;text-align:left;border-bottom:1px solid var(--line);z-index:1}
+.matrix-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.035);color:var(--txt);font-variant-numeric:tabular-nums}
+.matrix-table td.dim{color:var(--txt2);font-weight:600}
+.matrix-table td.num{text-align:right;font-weight:700}
+.matrix-table .mt-cell{border-radius:6px}
+.matrix-table tr:hover td{background:rgba(0,229,140,.03)}
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--txt3);padding:10px 12px;border-bottom:1px solid var(--line)}
+.data-table td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.035);color:var(--txt);font-variant-numeric:tabular-nums}
+.data-table td.num{text-align:right;font-weight:700}
+.data-table tbody tr:hover{background:rgba(0,229,140,.03)}
+.rank-list{display:flex;flex-direction:column;gap:0}
+.rank-item{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.045)}
+.rank-item:last-child{border-bottom:none}
+.rank-no{width:26px;height:26px;border-radius:8px;background:var(--greenDim);color:var(--green2);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rank-meta{flex:1;min-width:0}
+.rank-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-sub{font-size:10.5px;color:var(--txt3);margin-top:2px}
+.rank-val{font-size:12.5px;font-weight:800;color:var(--green2);font-variant-numeric:tabular-nums}
+.rank-bar{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--green3),var(--green2));margin-top:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#04150d" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9" stroke-opacity="0"/></svg></div>
+      <div>
+        <div class="brand-name">SupplyChainDW</div>
+        <div class="brand-sub">COMMAND CENTER</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" data-page="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>Home</div>
+      <div class="nav-item" data-page="exec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M5 19V9M10 19V5M15 19v-7M20 19V7"/></svg>Executive<span class="badge">CEO</span></div>
+      <div class="nav-label">Finance &amp; Sales</div>
+      <div class="nav-item" data-page="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.5-1.3-2.5-3-2.5s-3 1-3 2.5 1.2 2.2 3 2.5 3 1 3 2.5-1.3 2.5-3 2.5-3-1-3-2.5"/></svg>Financial<span class="badge">CFO</span></div>
+      <div class="nav-item" data-page="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 13l3-4 4 3 5-7"/></svg>Sales</div>
+      <div class="nav-label">People &amp; Product</div>
+      <div class="nav-item" data-page="customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.8-3.4 3.3-5 6.2-5s5.4 1.6 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.6 15.4c2 .4 3.7 1.8 4.4 4.1"/></svg>Customers</div>
+      <div class="nav-item" data-page="digital"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M16 21l4-4-4-4"/><path d="M13 5l-2 14"/></svg>Digital</div>
+      <div class="nav-label">Operations</div>
+      <div class="nav-item" data-page="supplychain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7"/><circle cx="7" cy="19.5" r="1.8"/><circle cx="17.5" cy="19.5" r="1.8"/></svg>Supply Chain</div>
+      <div class="nav-item" data-page="product"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>Products</div>
+      <div class="nav-label">Intelligence</div>
+      <div class="nav-item" data-page="geo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>Geography</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="row"><span class="status-dot"></span>Live · Gold Layer Synced</div>
+      <div class="row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64776f" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span id="lastLoad">Data up-to-date</span></div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <header class="topbar">
+      <div class="page-title">
+        <h1 id="pageTitle">Home</h1>
+        <p id="pageSub">Supply chain performance command center</p>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div style="position:relative">
+        <button class="tb-btn" id="bookmarkBtn" title="Bookmark current page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>
+          <span id="bookmarkLabel">Bookmark</span>
+        </button>
+        <div class="dropdown" id="bookmarkDropdown">
+          <div class="dd-head">Bookmarks</div>
+          <div class="bookmark-list" id="bookmarkList"></div>
+        </div>
+      </div>
+      <div style="position:relative">
+        <button class="tb-btn" id="loginBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1-3.6 4-5.2 7.5-5.2s6.5 1.6 7.5 5.2"/></svg>
+          <span id="loginLabel">Sign In</span>
+        </button>
+        <div class="dropdown" id="loginDropdown">
+          <div class="dd-head">Select Role</div>
+          <div class="dd-item" data-role="CEO"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19h16M5 19V9M10 19V5M15 19v-7M20 19V7"/></svg>CEO · Executive</div>
+          <div class="dd-item" data-role="CFO"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.5-1.3-2.5-3-2.5s-3 1-3 2.5 1.2 2.2 3 2.5 3 1 3 2.5-1.3 2.5-3 2.5-3-1-3-2.5"/></svg>CFO · Finance</div>
+          <div class="dd-item" data-role="Marketing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Marketing</div>
+          <div class="dd-item" data-role="Sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 13l3-4 4 3 5-7"/></svg>Sales</div>
+          <div class="dd-item" data-role="Ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7"/></svg>Operations</div>
+          <div class="dd-sep"></div>
+          <div class="dd-item" data-role="none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Sign Out</div>
+        </div>
+      </div>
+      <div class="clock">
+        <span class="clock-time" id="clockTime">--:--:--</span>
+        <span class="clock-date" id="clockDate">—</span>
+      </div>
+    </header>
+
+    <div class="slicer-bar" id="slicerBar">
+      <div class="sl-group"><div class="sl-label">Market</div><div class="sl-chips" id="sl-market"></div></div>
+      <div class="sl-group"><div class="sl-label">Year</div><div class="sl-chips" id="sl-year"></div></div>
+      <div class="sl-group"><div class="sl-label">Segment</div><div class="sl-chips" id="sl-seg"></div></div>
+      <div class="sl-group"><div class="sl-label">Shipping</div><div class="sl-chips" id="sl-ship"></div></div>
+      <button class="tb-btn sl-clear" id="btnClearSlicers" title="Clear all filters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>
+        <span>Clear</span>
+      </button>
+    </div>
+
+    <main class="content" id="content">
+      <!-- Pages injected here -->
+    </main>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   DATA (from Gold Layer)
+   ========================================================================== */
+const CUBE = [{"market":"Africa","seg":"Consumer","yr":2016,"ship":"First Class","orders":279,"revenue":169676.22,"profit":24123.12,"units":1936},{"market":"Africa","seg":"Consumer","yr":2016,"ship":"Same Day","orders":110,"revenue":60627.04,"profit":6006.34,"units":655},{"market":"Africa","seg":"Consumer","yr":2016,"ship":"Second Class","orders":329,"revenue":203003.89,"profit":20541.57,"units":2260},{"market":"Africa","seg":"Consumer","yr":2016,"ship":"Standard Class","orders":1091,"revenue":631946.66,"profit":67034.98,"units":7024},{"market":"Africa","seg":"Consumer","yr":2017,"ship":"First Class","orders":24,"revenue":14723.56,"profit":1515.71,"units":133},{"market":"Africa","seg":"Consumer","yr":2017,"ship":"Same Day","orders":15,"revenue":8871.96,"profit":324.86,"units":89},{"market":"Africa","seg":"Consumer","yr":2017,"ship":"Second Class","orders":37,"revenue":21594.57,"profit":1674.48,"units":238},{"market":"Africa","seg":"Consumer","yr":2017,"ship":"Standard Class","orders":124,"revenue":76990.17,"profit":8379.83,"units":896},{"market":"Africa","seg":"Corporate","yr":2016,"ship":"First Class","orders":156,"revenue":92681.94,"profit":10346.91,"units":1082},{"market":"Africa","seg":"Corporate","yr":2016,"ship":"Same Day","orders":65,"revenue":37843.25,"profit":2533.09,"units":454},{"market":"Africa","seg":"Corporate","yr":2016,"ship":"Second Class","orders":199,"revenue":117152.85,"profit":11004.54,"units":1254},{"market":"Africa","seg":"Corporate","yr":2016,"ship":"Standard Class","orders":620,"revenue":374021.35,"profit":41963.59,"units":4041},{"market":"Africa","seg":"Corporate","yr":2017,"ship":"First Class","orders":16,"revenue":9717.91,"profit":836.12,"units":115},{"market":"Africa","seg":"Corporate","yr":2017,"ship":"Same Day","orders":7,"revenue":4369.45,"profit":1087.03,"units":54},{"market":"Africa","seg":"Corporate","yr":2017,"ship":"Second Class","orders":22,"revenue":14809.24,"profit":1140.27,"units":147},{"market":"Africa","seg":"Corporate","yr":2017,"ship":"Standard Class","orders":82,"revenue":49161.51,"profit":6849.82,"units":524},{"market":"Africa","seg":"Home Office","yr":2016,"ship":"First Class","orders":76,"revenue":48621.40,"profit":5726.32,"units":582},{"market":"Africa","seg":"Home Office","yr":2016,"ship":"Same Day","orders":36,"revenue":21991.46,"profit":1588.71,"units":224},{"market":"Africa","seg":"Home Office","yr":2016,"ship":"Second Class","orders":108,"revenue":58114.91,"profit":4041.87,"units":688},{"market":"Africa","seg":"Home Office","yr":2016,"ship":"Standard Class","orders":376,"revenue":230941.75,"profit":26987.59,"units":2608},{"market":"Africa","seg":"Home Office","yr":2017,"ship":"First Class","orders":6,"revenue":1409.87,"profit":251.87,"units":19},{"market":"Africa","seg":"Home Office","yr":2017,"ship":"Same Day","orders":1,"revenue":769.79,"profit":134.97,"units":16},{"market":"Africa","seg":"Home Office","yr":2017,"ship":"Second Class","orders":20,"revenue":10691.81,"profit":1949.80,"units":116},{"market":"Africa","seg":"Home Office","yr":2017,"ship":"Standard Class","orders":55,"revenue":34720.32,"profit":6027.79,"units":448},{"market":"Europe","seg":"Consumer","yr":2015,"ship":"First Class","orders":666,"revenue":408307.28,"profit":47285.81,"units":4496},{"market":"Europe","seg":"Consumer","yr":2015,"ship":"Same Day","orders":241,"revenue":144263.78,"profit":14630.38,"units":1592},{"market":"Europe","seg":"Consumer","yr":2015,"ship":"Second Class","orders":823,"revenue":490258.24,"profit":45557.19,"units":5607},{"market":"Europe","seg":"Consumer","yr":2015,"ship":"Standard Class","orders":2541,"revenue":1489399.99,"profit":172205.87,"units":16737},{"market":"Europe","seg":"Consumer","yr":2016,"ship":"First Class","orders":117,"revenue":71818.52,"profit":6893.12,"units":800},{"market":"Europe","seg":"Consumer","yr":2016,"ship":"Same Day","orders":32,"revenue":18533.53,"profit":3133.32,"units":224},{"market":"Europe","seg":"Consumer","yr":2016,"ship":"Second Class","orders":132,"revenue":80624.49,"profit":9092.25,"units":921},{"market":"Europe","seg":"Consumer","yr":2016,"ship":"Standard Class","orders":361,"revenue":218892.93,"profit":22969.91,"units":2397},{"market":"Europe","seg":"Consumer","yr":2017,"ship":"First Class","orders":24,"revenue":13294.76,"profit":1148.83,"units":137},{"market":"Europe","seg":"Consumer","yr":2017,"ship":"Same Day","orders":9,"revenue":5424.04,"profit":620.36,"units":62},{"market":"Europe","seg":"Consumer","yr":2017,"ship":"Second Class","orders":24,"revenue":16704.24,"profit":1880.30,"units":160},{"market":"Europe","seg":"Consumer","yr":2017,"ship":"Standard Class","orders":75,"revenue":48895.74,"profit":5566.08,"units":497},{"market":"Europe","seg":"Corporate","yr":2015,"ship":"First Class","orders":266,"revenue":159799.78,"profit":15166.87,"units":1796},{"market":"Europe","seg":"Corporate","yr":2015,"ship":"Same Day","orders":102,"revenue":61690.91,"profit":6530.91,"units":689},{"market":"Europe","seg":"Corporate","yr":2015,"ship":"Second Class","orders":345,"revenue":203810.98,"profit":18047.75,"units":2294},{"market":"Europe","seg":"Corporate","yr":2015,"ship":"Standard Class","orders":1103,"revenue":646160.08,"profit":67555.92,"units":7084},{"market":"Europe","seg":"Corporate","yr":2016,"ship":"First Class","orders":49,"revenue":30516.20,"profit":3796.77,"units":329},{"market":"Europe","seg":"Corporate","yr":2016,"ship":"Same Day","orders":12,"revenue":7268.50,"profit":777.48,"units":84},{"market":"Europe","seg":"Corporate","yr":2016,"ship":"Second Class","orders":54,"revenue":33973.68,"profit":4162.44,"units":376},{"market":"Europe","seg":"Corporate","yr":2016,"ship":"Standard Class","orders":153,"revenue":92554.37,"profit":10418.46,"units":1040},{"market":"Europe","seg":"Corporate","yr":2017,"ship":"First Class","orders":11,"revenue":5907.88,"profit":640.74,"units":67},{"market":"Europe","seg":"Corporate","yr":2017,"ship":"Same Day","orders":3,"revenue":1667.50,"profit":128.52,"units":18},{"market":"Europe","seg":"Corporate","yr":2017,"ship":"Second Class","orders":12,"revenue":7477.20,"profit":839.44,"units":82},{"market":"Europe","seg":"Corporate","yr":2017,"ship":"Standard Class","orders":36,"revenue":21494.06,"profit":2521.77,"units":237},{"market":"Europe","seg":"Home Office","yr":2015,"ship":"First Class","orders":180,"revenue":105649.13,"profit":11266.54,"units":1169},{"market":"Europe","seg":"Home Office","yr":2015,"ship":"Same Day","orders":64,"revenue":38951.27,"profit":3654.45,"units":420},{"market":"Europe","seg":"Home Office","yr":2015,"ship":"Second Class","orders":221,"revenue":128314.31,"profit":13289.89,"units":1449},{"market":"Europe","seg":"Home Office","yr":2015,"ship":"Standard Class","orders":671,"revenue":393162.72,"profit":42906.11,"units":4314},{"market":"Europe","seg":"Home Office","yr":2016,"ship":"First Class","orders":32,"revenue":18973.30,"profit":1846.36,"units":206},{"market":"Europe","seg":"Home Office","yr":2016,"ship":"Same Day","orders":8,"revenue":4602.96,"profit":573.31,"units":55},{"market":"Europe","seg":"Home Office","yr":2016,"ship":"Second Class","orders":35,"revenue":21038.07,"profit":2134.49,"units":239},{"market":"Europe","seg":"Home Office","yr":2016,"ship":"Standard Class","orders":96,"revenue":57391.65,"profit":6642.64,"units":633},{"market":"Europe","seg":"Home Office","yr":2017,"ship":"First Class","orders":6,"revenue":3342.74,"profit":389.83,"units":37},{"market":"Europe","seg":"Home Office","yr":2017,"ship":"Same Day","orders":2,"revenue":1210.15,"profit":104.68,"units":13},{"market":"Europe","seg":"Home Office","yr":2017,"ship":"Second Class","orders":7,"revenue":4250.77,"profit":402.51,"units":47},{"market":"Europe","seg":"Home Office","yr":2017,"ship":"Standard Class","orders":21,"revenue":12740.60,"profit":1502.85,"units":138},{"market":"LATAM","seg":"Consumer","yr":2015,"ship":"First Class","orders":796,"revenue":493216.18,"profit":56812.54,"units":5335},{"market":"LATAM","seg":"Consumer","yr":2015,"ship":"Same Day","orders":290,"revenue":172716.84,"profit":18310.15,"units":1928},{"market":"LATAM","seg":"Consumer","yr":2015,"ship":"Second Class","orders":1016,"revenue":605305.68,"profit":61831.24,"units":6537},{"market":"LATAM","seg":"Consumer","yr":2015,"ship":"Standard Class","orders":3159,"revenue":1861417.28,"profit":214245.85,"units":20083},{"market":"LATAM","seg":"Consumer","yr":2016,"ship":"First Class","orders":130,"revenue":76764.61,"profit":7670.86,"units":833},{"market":"LATAM","seg":"Consumer","yr":2016,"ship":"Same Day","orders":41,"revenue":22911.55,"profit":2397.38,"units":255},{"market":"LATAM","seg":"Consumer","yr":2016,"ship":"Second Class","orders":170,"revenue":101940.94,"profit":10345.79,"units":1119},{"market":"LATAM","seg":"Consumer","yr":2016,"ship":"Standard Class","orders":466,"revenue":279488.04,"profit":27849.14,"units":3097},{"market":"LATAM","seg":"Consumer","yr":2017,"ship":"First Class","orders":28,"revenue":15879.91,"profit":1502.20,"units":161},{"market":"LATAM","seg":"Consumer","yr":2017,"ship":"Same Day","orders":10,"revenue":5460.26,"profit":632.08,"units":65},{"market":"LATAM","seg":"Consumer","yr":2017,"ship":"Second Class","orders":30,"revenue":18187.91,"profit":1925.62,"units":199},{"market":"LATAM","seg":"Consumer","yr":2017,"ship":"Standard Class","orders":98,"revenue":58880.23,"profit":6200.79,"units":651},{"market":"LATAM","seg":"Corporate","yr":2015,"ship":"First Class","orders":403,"revenue":243582.69,"profit":25478.31,"units":2660},{"market":"LATAM","seg":"Corporate","yr":2015,"ship":"Same Day","orders":148,"revenue":88916.21,"profit":8784.44,"units":962},{"market":"LATAM","seg":"Corporate","yr":2015,"ship":"Second Class","orders":508,"revenue":303848.26,"profit":30169.32,"units":3261},{"market":"LATAM","seg":"Corporate","yr":2015,"ship":"Standard Class","orders":1546,"revenue":916925.44,"profit":101228.87,"units":9803},{"market":"LATAM","seg":"Corporate","yr":2016,"ship":"First Class","orders":66,"revenue":39540.47,"profit":3868.75,"units":417},{"market":"LATAM","seg":"Corporate","yr":2016,"ship":"Same Day","orders":22,"revenue":12649.20,"profit":1219.13,"units":140},{"market":"LATAM","seg":"Corporate","yr":2016,"ship":"Second Class","orders":87,"revenue":51070.42,"profit":5130.69,"units":565},{"market":"LATAM","seg":"Corporate","yr":2016,"ship":"Standard Class","orders":235,"revenue":138830.88,"profit":14205.61,"units":1551},{"market":"LATAM","seg":"Corporate","yr":2017,"ship":"First Class","orders":12,"revenue":7302.10,"profit":769.57,"units":81},{"market":"LATAM","seg":"Corporate","yr":2017,"ship":"Same Day","orders":4,"revenue":2448.25,"profit":258.66,"units":27},{"market":"LATAM","seg":"Corporate","yr":2017,"ship":"Second Class","orders":14,"revenue":8335.95,"profit":833.72,"units":92},{"market":"LATAM","seg":"Corporate","yr":2017,"ship":"Standard Class","orders":39,"revenue":23321.07,"profit":2566.42,"units":257},{"market":"LATAM","seg":"Home Office","yr":2015,"ship":"First Class","orders":267,"revenue":157583.98,"profit":16536.88,"units":1725},{"market":"LATAM","seg":"Home Office","yr":2015,"ship":"Same Day","orders":100,"revenue":59299.03,"profit":6169.28,"units":659},{"market":"LATAM","seg":"Home Office","yr":2015,"ship":"Second Class","orders":345,"revenue":204313.01,"profit":20723.61,"units":2243},{"market":"LATAM","seg":"Home Office","yr":2015,"ship":"Standard Class","orders":1030,"revenue":607243.20,"profit":66545.13,"units":6576},{"market":"LATAM","seg":"Home Office","yr":2016,"ship":"First Class","orders":42,"revenue":24426.60,"profit":2547.57,"units":269},{"market":"LATAM","seg":"Home Office","yr":2016,"ship":"Same Day","orders":14,"revenue":7878.67,"profit":828.44,"units":89},{"market":"LATAM","seg":"Home Office","yr":2016,"ship":"Second Class","orders":53,"revenue":31458.78,"profit":3111.91,"units":347},{"market":"LATAM","seg":"Home Office","yr":2016,"ship":"Standard Class","orders":143,"revenue":83854.67,"profit":8950.46,"units":932},{"market":"LATAM","seg":"Home Office","yr":2017,"ship":"First Class","orders":8,"revenue":4750.61,"profit":459.79,"units":50},{"market":"LATAM","seg":"Home Office","yr":2017,"ship":"Same Day","orders":2,"revenue":1234.66,"profit":117.39,"units":13},{"market":"LATAM","seg":"Home Office","yr":2017,"ship":"Second Class","orders":9,"revenue":5278.82,"profit":510.93,"units":58},{"market":"LATAM","seg":"Home Office","yr":2017,"ship":"Standard Class","orders":26,"revenue":15419.98,"profit":1584.79,"units":170},{"market":"Pacific Asia","seg":"Consumer","yr":2015,"ship":"First Class","orders":647,"revenue":402107.46,"profit":44649.76,"units":4301},{"market":"Pacific Asia","seg":"Consumer","yr":2015,"ship":"Same Day","orders":240,"revenue":145121.86,"profit":15355.23,"units":1581},{"market":"Pacific Asia","seg":"Consumer","yr":2015,"ship":"Second Class","orders":843,"revenue":501475.37,"profit":48008.96,"units":5537},{"market":"Pacific Asia","seg":"Consumer","yr":2015,"ship":"Standard Class","orders":2556,"revenue":1517644.76,"profit":166174.43,"units":16064},{"market":"Pacific Asia","seg":"Consumer","yr":2016,"ship":"First Class","orders":115,"revenue":70528.53,"profit":7056.77,"units":781},{"market":"Pacific Asia","seg":"Consumer","yr":2016,"ship":"Same Day","orders":37,"revenue":21399.98,"profit":2299.89,"units":251},{"market":"Pacific Asia","seg":"Consumer","yr":2016,"ship":"Second Class","orders":142,"revenue":86231.93,"profit":9114.64,"units":972},{"market":"Pacific Asia","seg":"Consumer","yr":2016,"ship":"Standard Class","orders":388,"revenue":234938.05,"profit":24753.83,"units":2585},{"market":"Pacific Asia","seg":"Consumer","yr":2017,"ship":"First Class","orders":22,"revenue":12972.71,"profit":1355.10,"units":143},{"market":"Pacific Asia","seg":"Consumer","yr":2017,"ship":"Same Day","orders":8,"revenue":4704.92,"profit":493.26,"units":53},{"market":"Pacific Asia","seg":"Consumer","yr":2017,"ship":"Second Class","orders":25,"revenue":15148.86,"profit":1611.79,"units":164},{"market":"Pacific Asia","seg":"Consumer","yr":2017,"ship":"Standard Class","orders":74,"revenue":44287.45,"profit":4623.39,"units":487},{"market":"Pacific Asia","seg":"Corporate","yr":2015,"ship":"First Class","orders":261,"revenue":157106.89,"profit":17083.38,"units":1718},{"market":"Pacific Asia","seg":"Corporate","yr":2015,"ship":"Same Day","orders":99,"revenue":58911.27,"profit":5912.54,"units":642},{"market":"Pacific Asia","seg":"Corporate","yr":2015,"ship":"Second Class","orders":323,"revenue":193857.07,"profit":18714.31,"units":2110},{"market":"Pacific Asia","seg":"Corporate","yr":2015,"ship":"Standard Class","orders":987,"revenue":588237.70,"profit":63162.83,"units":6375},{"market":"Pacific Asia","seg":"Corporate","yr":2016,"ship":"First Class","orders":45,"revenue":26867.74,"profit":2953.52,"units":293},{"market":"Pacific Asia","seg":"Corporate","yr":2016,"ship":"Same Day","orders":14,"revenue":8202.14,"profit":808.71,"units":92},{"market":"Pacific Asia","seg":"Corporate","yr":2016,"ship":"Second Class","orders":58,"revenue":34552.13,"profit":3301.05,"units":383},{"market":"Pacific Asia","seg":"Corporate","yr":2016,"ship":"Standard Class","orders":157,"revenue":93065.91,"profit":10045.24,"units":1027},{"market":"Pacific Asia","seg":"Corporate","yr":2017,"ship":"First Class","orders":10,"revenue":5781.26,"profit":635.05,"units":63},{"market":"Pacific Asia","seg":"Corporate","yr":2017,"ship":"Same Day","orders":3,"revenue":1697.20,"profit":183.80,"units":19},{"market":"Pacific Asia","seg":"Corporate","yr":2017,"ship":"Second Class","orders":11,"revenue":6568.45,"profit":705.55,"units":73},{"market":"Pacific Asia","seg":"Corporate","yr":2017,"ship":"Standard Class","orders":30,"revenue":17856.49,"profit":1996.69,"units":195},{"market":"Pacific Asia","seg":"Home Office","yr":2015,"ship":"First Class","orders":163,"revenue":96788.53,"profit":9962.71,"units":1047},{"market":"Pacific Asia","seg":"Home Office","yr":2015,"ship":"Same Day","orders":56,"revenue":33214.09,"profit":3351.00,"units":367},{"market":"Pacific Asia","seg":"Home Office","yr":2015,"ship":"Second Class","orders":203,"revenue":120742.43,"profit":12086.04,"units":1312},{"market":"Pacific Asia","seg":"Home Office","yr":2015,"ship":"Standard Class","orders":622,"revenue":366312.09,"profit":39953.55,"units":3944},{"market":"Pacific Asia","seg":"Home Office","yr":2016,"ship":"First Class","orders":25,"revenue":14572.09,"profit":1459.82,"units":155},{"market":"Pacific Asia","seg":"Home Office","yr":2016,"ship":"Same Day","orders":8,"revenue":4557.14,"profit":487.04,"units":50},{"market":"Pacific Asia","seg":"Home Office","yr":2016,"ship":"Second Class","orders":31,"revenue":18322.57,"profit":1907.95,"units":202},{"market":"Pacific Asia","seg":"Home Office","yr":2016,"ship":"Standard Class","orders":85,"revenue":50255.37,"profit":5404.63,"units":550},{"market":"Pacific Asia","seg":"Home Office","yr":2017,"ship":"First Class","orders":5,"revenue":2865.83,"profit":302.79,"units":31},{"market":"Pacific Asia","seg":"Home Office","yr":2017,"ship":"Same Day","orders":2,"revenue":1175.83,"profit":111.18,"units":13},{"market":"Pacific Asia","seg":"Home Office","yr":2017,"ship":"Second Class","orders":5,"revenue":2943.79,"profit":313.51,"units":32},{"market":"Pacific Asia","seg":"Home Office","yr":2017,"ship":"Standard Class","orders":15,"revenue":8808.94,"profit":931.72,"units":96},{"market":"USCA","seg":"Consumer","yr":2015,"ship":"First Class","orders":404,"revenue":250504.90,"profit":27836.58,"units":2697},{"market":"USCA","seg":"Consumer","yr":2015,"ship":"Same Day","orders":146,"revenue":86483.03,"profit":9256.62,"units":951},{"market":"USCA","seg":"Consumer","yr":2015,"ship":"Second Class","orders":508,"revenue":303027.90,"profit":30914.19,"units":3313},{"market":"USCA","seg":"Consumer","yr":2015,"ship":"Standard Class","orders":1551,"revenue":916689.84,"profit":102384.24,"units":9939},{"market":"USCA","seg":"Consumer","yr":2016,"ship":"First Class","orders":70,"revenue":42783.39,"profit":4411.52,"units":450},{"market":"USCA","seg":"Consumer","yr":2016,"ship":"Same Day","orders":24,"revenue":13953.77,"profit":1431.63,"units":159},{"market":"USCA","seg":"Consumer","yr":2016,"ship":"Second Class","orders":91,"revenue":54720.05,"profit":5633.91,"units":610},{"market":"USCA","seg":"Consumer","yr":2016,"ship":"Standard Class","orders":249,"revenue":149669.72,"profit":15566.08,"units":1667},{"market":"USCA","seg":"Consumer","yr":2017,"ship":"First Class","orders":14,"revenue":8263.10,"profit":871.43,"units":91},{"market":"USCA","seg":"Consumer","yr":2017,"ship":"Same Day","orders":5,"revenue":2958.29,"profit":303.04,"units":32},{"market":"USCA","seg":"Consumer","yr":2017,"ship":"Second Class","orders":16,"revenue":9582.34,"profit":993.92,"units":105},{"market":"USCA","seg":"Consumer","yr":2017,"ship":"Standard Class","orders":44,"revenue":26202.14,"profit":2755.86,"units":287},{"market":"USCA","seg":"Corporate","yr":2015,"ship":"First Class","orders":162,"revenue":97435.91,"profit":10413.63,"units":1068},{"market":"USCA","seg":"Corporate","yr":2015,"ship":"Same Day","orders":59,"revenue":35043.58,"profit":3606.95,"units":380},{"market":"USCA","seg":"Corporate","yr":2015,"ship":"Second Class","orders":202,"revenue":120234.10,"profit":12451.94,"units":1317},{"market":"USCA","seg":"Corporate","yr":2015,"ship":"Standard Class","orders":615,"revenue":365102.18,"profit":40088.40,"units":3969},{"market":"USCA","seg":"Corporate","yr":2016,"ship":"First Class","orders":28,"revenue":16613.39,"profit":1735.22,"units":178},{"market":"USCA","seg":"Corporate","yr":2016,"ship":"Same Day","orders":10,"revenue":5774.90,"profit":572.93,"units":63},{"market":"USCA","seg":"Corporate","yr":2016,"ship":"Second Class","orders":36,"revenue":21407.53,"profit":2272.41,"units":240},{"market":"USCA","seg":"Corporate","yr":2016,"ship":"Standard Class","orders":97,"revenue":57776.14,"profit":5991.22,"units":641},{"market":"USCA","seg":"Corporate","yr":2017,"ship":"First Class","orders":5,"revenue":2963.85,"profit":293.78,"units":32},{"market":"USCA","seg":"Corporate","yr":2017,"ship":"Same Day","orders":2,"revenue":1175.10,"profit":117.60,"units":13},{"market":"USCA","seg":"Corporate","yr":2017,"ship":"Second Class","orders":7,"revenue":4164.96,"profit":415.90,"units":46},{"market":"USCA","seg":"Corporate","yr":2017,"ship":"Standard Class","orders":18,"revenue":10673.56,"profit":1111.43,"units":116},{"market":"USCA","seg":"Home Office","yr":2015,"ship":"First Class","orders":115,"revenue":68813.00,"profit":7360.58,"units":741},{"market":"USCA","seg":"Home Office","yr":2015,"ship":"Same Day","orders":42,"revenue":25024.43,"profit":2477.89,"units":272},{"market":"USCA","seg":"Home Office","yr":2015,"ship":"Second Class","orders":145,"revenue":86315.37,"profit":8799.07,"units":938},{"market":"USCA","seg":"Home Office","yr":2015,"ship":"Standard Class","orders":438,"revenue":258471.79,"profit":28619.53,"units":2783},{"market":"USCA","seg":"Home Office","yr":2016,"ship":"First Class","orders":20,"revenue":11762.69,"profit":1216.10,"units":128},{"market":"USCA","seg":"Home Office","yr":2016,"ship":"Same Day","orders":7,"revenue":4012.50,"profit":393.75,"units":44},{"market":"USCA","seg":"Home Office","yr":2016,"ship":"Second Class","orders":26,"revenue":15366.29,"profit":1555.22,"units":168},{"market":"USCA","seg":"Home Office","yr":2016,"ship":"Standard Class","orders":70,"revenue":41246.16,"profit":4512.66,"units":454},{"market":"USCA","seg":"Home Office","yr":2017,"ship":"First Class","orders":3,"revenue":1768.64,"profit":180.18,"units":19},{"market":"USCA","seg":"Home Office","yr":2017,"ship":"Same Day","orders":1,"revenue":576.23,"profit":65.69,"units":6},{"market":"USCA","seg":"Home Office","yr":2017,"ship":"Second Class","orders":5,"revenue":2980.78,"profit":302.56,"units":32},{"market":"USCA","seg":"Home Office","yr":2017,"ship":"Standard Class","orders":13,"revenue":7681.60,"profit":808.21,"units":84}];
+const TREND = [{"year":2015,"mo":1,"mn":"January","revenue":1051590.06,"profit":111660.74},{"year":2015,"mo":2,"mn":"February","revenue":927009.88,"profit":99140.66},{"year":2015,"mo":3,"mn":"March","revenue":1051253.67,"profit":113778.21},{"year":2015,"mo":4,"mn":"April","revenue":1014463.26,"profit":108083.68},{"year":2015,"mo":5,"mn":"May","revenue":1050478.42,"profit":112147.90},{"year":2015,"mo":6,"mn":"June","revenue":1024006.15,"profit":110147.16},{"year":2015,"mo":7,"mn":"July","revenue":1038081.17,"profit":115624.06},{"year":2015,"mo":8,"mn":"August","revenue":1029494.67,"profit":117979.77},{"year":2015,"mo":9,"mn":"September","revenue":1018338.58,"profit":113467.94},{"year":2015,"mo":10,"mn":"October","revenue":1049154.25,"profit":101757.87},{"year":2015,"mo":11,"mn":"November","revenue":1029120.22,"profit":104427.36},{"year":2015,"mo":12,"mn":"December","revenue":1057840.86,"profit":110641.55},{"year":2016,"mo":1,"mn":"January","revenue":1046308.23,"profit":106780.95},{"year":2016,"mo":2,"mn":"February","revenue":968542.83,"profit":86809.49},{"year":2016,"mo":3,"mn":"March","revenue":1025853.10,"profit":101259.99},{"year":2016,"mo":4,"mn":"April","revenue":1001211.56,"profit":114976.62},{"year":2016,"mo":5,"mn":"May","revenue":1029400.18,"profit":110716.12},{"year":2016,"mo":6,"mn":"June","revenue":1003059.53,"profit":104196.07},{"year":2016,"mo":7,"mn":"July","revenue":1045715.60,"profit":119941.72},{"year":2016,"mo":8,"mn":"August","revenue":1048200.23,"profit":110729.54},{"year":2016,"mo":9,"mn":"September","revenue":1002397.02,"profit":123384.71},{"year":2016,"mo":10,"mn":"October","revenue":1048130.53,"profit":116781.97},{"year":2016,"mo":11,"mn":"November","revenue":1047590.12,"profit":109539.20},{"year":2016,"mo":12,"mn":"December","revenue":1037408.15,"profit":105002.69},{"year":2017,"mo":1,"mn":"January","revenue":1029698.00,"profit":114843.85},{"year":2017,"mo":2,"mn":"February","revenue":992534.88,"profit":115111.07},{"year":2017,"mo":3,"mn":"March","revenue":1048004.76,"profit":118688.90},{"year":2017,"mo":4,"mn":"April","revenue":1038321.60,"profit":115961.06},{"year":2017,"mo":5,"mn":"May","revenue":1105485.30,"profit":115014.64},{"year":2017,"mo":6,"mn":"June","revenue":1032086.47,"profit":110399.29},{"year":2017,"mo":7,"mn":"July","revenue":1104373.34,"profit":113026.70},{"year":2017,"mo":8,"mn":"August","revenue":1109337.15,"profit":131501.16},{"year":2017,"mo":9,"mn":"September","revenue":1143775.09,"profit":122462.39},{"year":2017,"mo":10,"mn":"October","revenue":1073994.16,"profit":113447.17},{"year":2017,"mo":11,"mn":"November","revenue":626914.37,"profit":67791.25},{"year":2017,"mo":12,"mn":"December","revenue":503910.81,"profit":65837.63},{"year":2018,"mo":1,"mn":"January","revenue":331650.11,"profit":33841.89}];
+const MARKET = [{"market":"USCA","revenue":5066528.61,"profit":564313.78,"orders":8579},{"market":"Africa","revenue":2294452.88,"profit":252071.18,"orders":3854},{"market":"Europe","revenue":10872396.60,"profit":1169442.96,"orders":18561},{"market":"Pacific Asia","revenue":8273743.58,"profit":857753.44,"orders":17577},{"market":"LATAM","revenue":10277612.64,"profit":1123321.61,"orders":17181}];
+const CATEGORY = [{"category_name":"Fishing","revenue":6929653.50,"units":17325,"profit":756220.76},{"category_name":"Cleats","revenue":4431942.66,"units":73734,"profit":494636.92},{"category_name":"Camping & Hiking","revenue":4118425.42,"units":13729,"profit":427455.57},{"category_name":"Cardio Equipment","revenue":3694843.20,"units":37587,"profit":383011.10},{"category_name":"Women's Apparel","revenue":3147800.00,"units":62956,"profit":350421.03},{"category_name":"Water Sports","revenue":3113844.60,"units":15540,"profit":325146.96},{"category_name":"Men's Footwear","revenue":2891757.54,"units":22246,"profit":311902.82},{"category_name":"Indoor/Outdoor Games","revenue":2888993.94,"units":57803,"profit":318451.43},{"category_name":"Shop By Sport","revenue":1309522.02,"units":32726,"profit":129813.96},{"category_name":"Computers","revenue":663000.00,"units":442,"profit":69656.81},{"category_name":"Electronics","revenue":371034.64,"units":9436,"profit":40891.38},{"category_name":"Cameras","revenue":267607.68,"units":592,"profit":30289.80}];
+const SHIPPING = [{"shipping_mode":"Standard Class","orders":107752,"late_orders":41023,"late_pct":38.071683124211,"revenue":22022391.46},{"shipping_mode":"First Class","orders":27814,"late_orders":26513,"late_pct":95.322499460703,"revenue":5674369.65},{"shipping_mode":"Second Class","orders":35216,"late_orders":26987,"late_pct":76.632780554293,"revenue":7145444.68},{"shipping_mode":"Same Day","orders":9737,"late_orders":4454,"late_pct":45.743042004724,"revenue":1942528.52}];
+const ORDERSTATUS = [{"order_status":"COMPLETE","orders":59491,"revenue":12095314.72},{"order_status":"PAYMENT_REVIEW","orders":1893,"revenue":383653.65},{"order_status":"PENDING_PAYMENT","orders":39832,"revenue":8106697.40},{"order_status":"CLOSED","orders":19616,"revenue":4022624.09},{"order_status":"ON_HOLD","orders":9804,"revenue":1981542.67},{"order_status":"CANCELED","orders":3692,"revenue":744370.39},{"order_status":"SUSPECTED_FRAUD","orders":4062,"revenue":825934.94},{"order_status":"PROCESSING","orders":21902,"revenue":4504063.66},{"order_status":"PENDING","orders":20227,"revenue":4120532.79}];
+const SEGMENT = [{"segment":"Corporate","customers":6239,"revenue":11168406.63,"profit":1202574.96,"orders":19856},{"segment":"Consumer","customers":10695,"revenue":19095789.79,"profit":2073487.67,"orders":34119},{"segment":"Home Office","customers":3718,"revenue":6520537.89,"profit":690840.34,"orders":11777}];
+const DELIVERY = [{"delivery_status":"Advance shipping","orders":41592},{"delivery_status":"Shipping on time","orders":32196},{"delivery_status":"Late delivery","orders":98977},{"delivery_status":"Shipping canceled","orders":7754}];
+const HOURLY = [{"hr":0,"views":2227},{"hr":1,"views":2224},{"hr":2,"views":2222},{"hr":3,"views":2216},{"hr":4,"views":2288},{"hr":5,"views":2321},{"hr":6,"views":22856},{"hr":7,"views":23387},{"hr":8,"views":22942},{"hr":9,"views":22925},{"hr":10,"views":24036},{"hr":11,"views":24801},{"hr":12,"views":24422},{"hr":13,"views":23441},{"hr":14,"views":23055},{"hr":15,"views":23575},{"hr":16,"views":23868},{"hr":17,"views":24544},{"hr":18,"views":25575},{"hr":19,"views":28292},{"hr":20,"views":30551},{"hr":21,"views":30749},{"hr":22,"views":29682},{"hr":23,"views":27778}];
+const TOPVIEWS = [{"product":"Perfect Fitness Perfect Rip Deck","views":27878,"revenue":4421143.02},{"product":"adidas Kids' RG III Mid Football Cleat","views":26200,"revenue":0.00},{"product":"Nike Men's Dri-FIT Victory Golf Polo","views":25627,"revenue":3147800.00},{"product":"Nike Men's CJ Elite 2 TD Football Cleat","views":25241,"revenue":2891757.54},{"product":"O'Brien Men's Neoprene Life Vest","views":16194,"revenue":2888993.94},{"product":"Pelican Sunstream 100 Kayak","views":16186,"revenue":3099845.00},{"product":"Diamondback Women's Serene Classic Comfort Bi","views":15521,"revenue":4118425.42},{"product":"Field & Stream Sportsman 16 Gun Fire Safe","views":15178,"revenue":6929653.50},{"product":"Under Armour Hustle Storm Medium Duffle Bag","views":13752,"revenue":29601.54},{"product":"Columbia Men's PFG Anchor Tough T-Shirt","views":13716,"revenue":27840.00}];
+const REGION = [{"region":"Western Europe","revenue":5894380.66,"orders":10010},{"region":"Central America","revenue":5665711.99,"orders":9396},{"region":"South America","revenue":2960881.35,"orders":4979},{"region":"Northern Europe","revenue":2155830.61,"orders":3716},{"region":"Southern Europe","revenue":2047918.78,"orders":3543},{"region":"Oceania","revenue":2016654.16,"orders":4362},{"region":"Southeast Asia","revenue":1932495.53,"orders":4356},{"region":"Caribbean","revenue":1651019.30,"orders":2806},{"region":"West of USA","revenue":1571415.93,"orders":2667},{"region":"South Asia","revenue":1553680.89,"orders":3335},{"region":"Eastern Asia","revenue":1486401.31,"orders":3318},{"region":"East of USA","revenue":1371111.96,"orders":2323},{"region":"West Asia","revenue":1174671.76,"orders":2022},{"region":"US Center","revenue":1151355.75,"orders":1935},{"region":"South of  USA","revenue":785783.93,"orders":1345},{"region":"Eastern Europe","revenue":774266.55,"orders":1292},{"region":"West Africa","revenue":727951.18,"orders":1223},{"region":"North Africa","revenue":634752.21,"orders":1064},{"region":"East Africa","revenue":376234.89,"orders":613},{"region":"Central Africa","revenue":327263.01,"orders":556},{"region":"Southern Africa","revenue":228251.59,"orders":398},{"region":"Canada","revenue":186861.04,"orders":309},{"region":"Central Asia","revenue":109839.93,"orders":184}];
+const MATRIX = [{"market":"USCA","dept":"Outdoors","revenue":117327.34},{"market":"USCA","dept":"Footwear","revenue":567589.11},{"market":"Europe","dept":"Footwear","revenue":1172236.25},{"market":"Pacific Asia","dept":"Technology","revenue":182605.16},{"market":"Africa","dept":"Outdoors","revenue":55109.65},{"market":"Africa","dept":"Fitness","revenue":16434.81},{"market":"Pacific Asia","dept":"Health and Beauty","revenue":106080.48},{"market":"Europe","dept":"Outdoors","revenue":350266.33},{"market":"LATAM","dept":"Fan Shop","revenue":5134797.26},{"market":"Europe","dept":"Book Shop","revenue":9572.64},{"market":"Africa","dept":"Fan Shop","revenue":1152387.72},{"market":"Pacific Asia","dept":"Fan Shop","revenue":3554859.18},{"market":"Pacific Asia","dept":"Golf","revenue":933848.78},{"market":"Europe","dept":"Golf","revenue":1277014.77},{"market":"USCA","dept":"Apparel","revenue":1115053.66},{"market":"LATAM","dept":"Apparel","revenue":2165895.55},{"market":"USCA","dept":"Fan Shop","revenue":2531514.92},{"market":"Europe","dept":"Fitness","revenue":104410.25},{"market":"LATAM","dept":"Fitness","revenue":81032.74},{"market":"Pacific Asia","dept":"Discs Shop","revenue":192044.46},{"market":"Africa","dept":"Apparel","revenue":493435.25},{"market":"Europe","dept":"Technology","revenue":856993.80},{"market":"Pacific Asia","dept":"Fitness","revenue":160585.51},{"market":"Pacific Asia","dept":"Book Shop","revenue":3014.76},{"market":"Europe","dept":"Fan Shop","revenue":4740311.46},{"market":"USCA","dept":"Fitness","revenue":34587.58},{"market":"LATAM","dept":"Outdoors","revenue":309234.87},{"market":"Pacific Asia","dept":"Footwear","revenue":800644.41},{"market":"LATAM","dept":"Footwear","revenue":1192787.55},{"market":"Pacific Asia","dept":"Outdoors","revenue":421413.25},{"market":"Africa","dept":"Footwear","revenue":273241.45},{"market":"Pacific Asia","dept":"Pet Shop","revenue":41524.80},{"market":"USCA","dept":"Golf","revenue":700456.00},{"market":"Europe","dept":"Discs Shop","revenue":36843.27},{"market":"Europe","dept":"Apparel","revenue":2324747.83},{"market":"LATAM","dept":"Golf","revenue":1393864.67},{"market":"Africa","dept":"Golf","revenue":303844.00},{"market":"Pacific Asia","dept":"Apparel","revenue":1877122.79}];
+const LOGTREND = [{"yr":2017,"mo":9,"mn":"September","views":137238},{"yr":2017,"mo":10,"mn":"October","views":84205},{"yr":2017,"mo":11,"mn":"November","views":80860},{"yr":2017,"mo":12,"mn":"December","views":84093},{"yr":2018,"mo":1,"mn":"January","views":83581}];
+const DEPTVIEWS = [{"dept":"Outdoors","views":79926},{"dept":"Apparel","views":79319},{"dept":"Footwear","views":79136},{"dept":"Fan Shop","views":78724},{"dept":"Fitness","views":76437},{"dept":"Golf","views":76435}];
+const CATVIEWS = [{"category_name":"Cleats","views":27878},{"category_name":"Shop By Sport","views":26227},{"category_name":"featured shops","views":26200},{"category_name":"Women's Apparel","views":25627},{"category_name":"Men's Footwear","views":25241},{"category_name":"Girls' Apparel","views":24581},{"category_name":"Electronics","views":20845},{"category_name":"Indoor/Outdoor Games","views":16194},{"category_name":"Water Sports","views":16186},{"category_name":"Hunting & Shooting","views":15645},{"category_name":"Camping & Hiking","views":15521},{"category_name":"Fishing","views":15178},{"category_name":"Fitness Accessories","views":13752},{"category_name":"Hockey","views":13657},{"category_name":"Cardio Equipment","views":13641},{"category_name":"As Seen on  TV!","views":13448},{"category_name":"Tennis & Racquet","views":13275},{"category_name":"Lacrosse","views":12676},{"category_name":"Strength Training","views":12479},{"category_name":"Basketball","views":12313},{"category_name":"Soccer","views":12271},{"category_name":"Boxing & MMA","views":12260},{"category_name":"baseball & softball","views":12245},{"category_name":"Women's Golf Clubs","views":7782},{"category_name":"Golf Shoes","views":7732},{"category_name":"Golf Gloves","views":7510},{"category_name":"Golf Bags & Carts","views":7438},{"category_name":"Golf Apparel","views":7427},{"category_name":"Accessories","views":7279},{"category_name":"Kids' Golf Clubs","views":7234},{"category_name":"Trade-In","views":7208},{"category_name":"Golf Balls","views":7063},{"category_name":"Men's Golf Clubs","views":5964}];
+const CITIES = [{"city":"Caguas","customers":7652,"revenue":13610265.95},{"city":"Chicago","customers":435,"revenue":797614.19},{"city":"Los Angeles","customers":393,"revenue":697887.41},{"city":"Brooklyn","customers":375,"revenue":676419.77},{"city":"New York","customers":194,"revenue":361217.09},{"city":"Philadelphia","customers":164,"revenue":315705.50},{"city":"Bronx","customers":173,"revenue":308905.00},{"city":"San Diego","customers":154,"revenue":293830.51},{"city":"Miami","customers":138,"revenue":270368.19},{"city":"Houston","customers":148,"revenue":267347.91}];
+
+const DATA = {
+  kpi: {"revenue":36784734.31,"profit":3966902.97,"margin":10.784100,"orders":65752,"line_items":180519,"customers":20652,"products":122,"aov":559.446622,"avg_discount_pct":10.166800,"late_pct":54.829131559500,"total_units":384079},
+  cube: CUBE, trend: TREND, market: MARKET, category: CATEGORY, shipping: SHIPPING,
+  orderstatus: ORDERSTATUS, segment: SEGMENT, delivery: DELIVERY, hourly: HOURLY,
+  topviews: TOPVIEWS, region: REGION, matrix: MATRIX, logtrend: LOGTREND,
+  deptviews: DEPTVIEWS, catviews: CATVIEWS, cities: CITIES
+};
+
+/* ==========================================================================
+   STATE
+   ========================================================================== */
+const state = {
+  page: 'home',
+  role: null,
+  market: [],       // selected markets
+  year: [],         // selected years
+  seg: [],          // selected segments
+  ship: [],         // selected shipping modes
+  bookmarks: new Set()
+};
+const chartRegistry = {};
+
+/* ==========================================================================
+   HELPER: cube filtering
+   ========================================================================== */
+function cubeFiltered(){
+  let rows = DATA.cube;
+  if(state.market.length) rows = rows.filter(r=>state.market.includes(r.market));
+  if(state.year.length)   rows = rows.filter(r=>state.year.includes(r.yr));
+  if(state.seg.length)    rows = rows.filter(r=>state.seg.includes(r.seg));
+  if(state.ship.length)   rows = rows.filter(r=>state.ship.includes(r.ship));
+  return rows;
+}
+function cubeAgg(fn){ const rows = cubeFiltered(); return {revenue:rows.reduce((s,r)=>s+r.revenue,0), profit:rows.reduce((s,r)=>s+r.profit,0), orders:rows.reduce((s,r)=>s+r.orders,0), units:rows.reduce((s,r)=>s+r.units,0)}; }
+
+/* ==========================================================================
+   RENDERING UTILITIES
+   ========================================================================== */
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function destroyChart(id){ if(chartRegistry[id]){ chartRegistry[id].destroy(); delete chartRegistry[id]; } }
+function renderChart(id, cfg){
+  destroyChart(id);
+  const el = document.getElementById(id);
+  if(!el) return;
+  let canvas = el.tagName==='CANVAS' ? el : el.querySelector('canvas');
+  if(!canvas){ canvas = document.createElement('canvas'); el.appendChild(canvas); }
+  const ctx = canvas.getContext('2d');
+  chartRegistry[id] = new Chart(ctx, cfg);
+}
+function baseChart(extra){
+  return Object.assign({
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:600,easing:'easeOutQuart'},
+      plugins:{legend:{labels:{color:'#9fb4ab',font:{family:'Inter',size:11,weight:'600'},usePointStyle:true,boxWidth:7,boxHeight:7,padding:14}},tooltip:{backgroundColor:'#0c1416',borderColor:'#223034',borderWidth:1,titleColor:'#fff',bodyColor:'#cfdcd5',padding:11,cornerRadius:10,titleFont:{family:'Inter',weight:'700'},bodyFont:{family:'Inter'}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.035)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5}},border:{color:'#1c2629'}},
+        y:{grid:{color:'rgba(255,255,255,.045)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5}},border:{color:'#1c2629'}}
+      }
+    },
+    ...extra
+  });
+}
+const GREEN='#00e58c', GREEN2='#00ffa3', AMBER='#ffb454', RED='#ff6b6b', BLUE='#4dd0ff', PURPLE='#b388ff';
+const PALETTE=['#00e58c','#4dd0ff','#b388ff','#ffb454','#ff6b6b','#ff8bcb','#7fe08f','#5ac8fa','#ffd60a','#64d2ff','#ff9f0a','#bf5af2'];
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ==========================================================================
+   PAGES
+   ========================================================================== */
+const PAGES = {
+  title: {
+    home:['Home','Supply chain performance command center'],
+    exec:['Executive Overview','Top-line performance for leadership'],
+    finance:['Financial Performance','Profitability, margin and discount analysis'],
+    sales:['Sales Performance','Orders, funnel and channel breakdown'],
+    customers:['Customer & Marketing','Segments, acquisition and customer value'],
+    digital:['Digital Engagement','Product views, traffic and engagement'],
+    supplychain:['Supply Chain & Operations','Delivery, latency and fulfillment health'],
+    product:['Product & Catalog','Product performance and category mix'],
+    geo:['Geographic Intelligence','Regional and market distribution']
+  },
+  byRole: { CEO:'exec', CFO:'finance', Marketing:'customers', Sales:'sales', Ops:'supplychain' }
+};
+
+/* ==========================================================================
+   SLICER HELPERS
+   ========================================================================== */
+function buildSlicerChips(){
+  const markets = [...new Set(DATA.cube.map(r=>r.market))].sort();
+  const years = [...new Set(DATA.cube.map(r=>r.yr))].sort();
+  const segs = [...new Set(DATA.cube.map(r=>r.seg))].sort();
+  const ships = [...new Set(DATA.cube.map(r=>r.ship))].sort();
+  chips('sl-market', markets, state.market, (v)=>toggleState('market',v));
+  chips('sl-year', years.map(String), state.year.map(String), (v)=>toggleState('year',v));
+  chips('sl-seg', segs, state.seg, (v)=>toggleState('seg',v));
+  chips('sl-ship', ships, state.ship, (v)=>toggleState('ship',v));
+}
+function chips(id, values, selected, onClick){
+  const el = document.getElementById(id); if(!el) return;
+  el.innerHTML = values.map(v=>{
+    const on = selected.includes(v);
+    return `<div class="sl-chip ${on?'on':''}" data-v="${esc(v)}">${esc(v)}${on?'<span class="x">×</span>':''}</div>`;
+  }).join('');
+  el.querySelectorAll('.sl-chip').forEach(c=>c.addEventListener('click',()=>onClick(c.dataset.v)));
+}
+function toggleState(key, v){
+  v = key==='year' ? Number(v) : v;
+  const idx = state[key].indexOf(v);
+  if(idx>=0) state[key].splice(idx,1); else state[key].push(v);
+  buildSlicerChips(); refreshAll();
+}
+function clearAllSlicers(){
+  state.market=[]; state.year=[]; state.seg=[]; state.ship=[];
+  buildSlicerChips(); refreshAll();
+}
+function activeFilterCount(){ return state.market.length+state.year.length+state.seg.length+state.ship.length; }
+
+/* ==========================================================================
+   KPI RENDER
+   ========================================================================== */
+function kpiCard(icon, label, value, delta, deltaDir, cls){
+  const d = delta==null ? '' : `<div class="k-delta ${deltaDir==='up'?'up':'down'}">${deltaDir==='up'?'▲':'▼'} ${delta}</div>`;
+  return `<div class="kpi ${cls||''}">
+    <div class="k-ico" style="background:${icon.bg};color:${icon.color}">${icon.svg}</div>
+    <div class="k-label">${label}</div>
+    <div class="k-value">${value}</div>
+    ${d}<div class="k-bar"></div></div>`;
+}
+const ICONS = {
+  revenue:{color:GREEN2,bg:'rgba(0,229,140,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.5-1.3-2.5-3-2.5s-3 1-3 2.5 1.2 2.2 3 2.5 3 1 3 2.5-1.3 2.5-3 2.5-3-1-3-2.5"/></svg>'},
+  profit:{color:PURPLE,bg:'rgba(179,136,255,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M17 8.5c0-2.5-2.2-4-5-4s-5 1.5-5 4 2.2 3.7 5 4 5 1.5 5 4-2.2 4-5 4-5-1.5-5-4"/><path d="M5 12h14"/></svg>'},
+  orders:{color:BLUE,bg:'rgba(77,208,255,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h5"/></svg>'},
+  customers:{color:GREEN2,bg:'rgba(0,229,140,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.8-3.4 3.3-5 6.2-5s5.4 1.6 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.6 15.4c2 .4 3.7 1.8 4.4 4.1"/></svg>'},
+  aov:{color:AMBER,bg:'rgba(255,180,84,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 7l1 13h14l1-13"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>'},
+  margin:{color:GREEN2,bg:'rgba(0,229,140,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6c0-2.5-2.2-4-5-4s-5 1.5-5 4 2.2 3.7 5 4 5 1.5 5 4-2.2 4-5 4-5-1.5-5-4"/></svg>'},
+  late:{color:RED,bg:'rgba(255,107,107,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>'},
+  units:{color:BLUE,bg:'rgba(77,208,255,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>'},
+  views:{color:GREEN2,bg:'rgba(0,229,140,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'},
+  discount:{color:AMBER,bg:'rgba(255,180,84,.12)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="17" r="2.6"/></svg>'}
+};
+function kpiRow(){
+  const agg = cubeAgg();
+  const active = activeFilterCount()>0;
+  const rev = active ? agg.revenue : DATA.kpi.revenue;
+  const prof = active ? agg.profit : DATA.kpi.profit;
+  const ord = active ? agg.orders : DATA.kpi.orders;
+  const units = active ? agg.units : DATA.kpi.total_units;
+  const mar = rev? prof/rev*100 : 0;
+  const aov = ord? rev/ord : 0;
+  const cst = DATA.kpi.customers;
+  return `<div class="kpi-grid">
+    ${kpiCard(ICONS.revenue,'Total Revenue',compactMoney(rev),null)}
+    ${kpiCard(ICONS.profit,'Total Profit',compactMoney(prof),null)}
+    ${kpiCard(ICONS.margin,'Profit Margin',mar.toFixed(2)+'%',null)}
+    ${kpiCard(ICONS.orders,'Orders',compactNum(ord),null)}
+    ${kpiCard(ICONS.customers,'Customers',compactNum(cst),null)}
+    ${kpiCard(ICONS.aov,'Avg Order Value',compactMoney(aov),null)}
+    ${kpiCard(ICONS.units,'Units Sold',compactNum(units),null)}
+  </div>`;
+}
+
+/* ==========================================================================
+   PAGE TEMPLATES
+   ========================================================================== */
+function pageHome(){
+  return `<section class="home-hero">
+    <div class="inner">
+      <div class="kicker">SupplyChainDW · Gold Layer Analytics</div>
+      <h1>Supply chain <span>performance,</span> in one command center.</h1>
+      <p>Executive, financial, sales, customer, digital, product and logistics intelligence extracted from the gold star schema — designed for every role in the organization.</p>
+      <div class="hero-cta">
+        <button class="tb-btn primary" onclick="go('exec')">View Executive Overview</button>
+        <button class="tb-btn" onclick="go('digital')">Explore Digital</button>
+      </div>
+    </div>
+  </section>
+  <div class="page-head"><h2>Workspace</h2><div class="sub">Choose a module to begin your analysis</div></div>
+  <div class="home-cards">
+    ${homeCard('exec','Executive Overview','Top-line revenue, profit, market share and the risk gauge for the CEO.',ICONS.revenue.svg)}
+    ${homeCard('finance','Financial Performance','Profitability, margin tiers, discount leakage and P&L breakdowns for the CFO.',ICONS.profit.svg)}
+    ${homeCard('sales','Sales Performance','Order funnel, channel mix, regions and segment contribution for sales teams.',ICONS.orders.svg)}
+    ${homeCard('customers','Customer & Marketing','Segments, acquisition trends and customer value for the marketing team.',ICONS.customers.svg)}
+    ${homeCard('digital','Digital Engagement','Product views, hourly traffic and engagement analytics from access logs.',ICONS.views.svg)}
+    ${homeCard('supplychain','Supply Chain & Ops','Delivery status, late-delivery risk and shipping-mode health for operations.',ICONS.late.svg)}
+    ${homeCard('product','Product & Catalog','Product performance matrix, category mix and view-to-revenue correlation.',ICONS.units.svg)}
+    ${homeCard('geo','Geographic Intelligence','Market, region and city distribution across the globe.',ICONS.aov.svg)}
+  </div>`;
+}
+function homeCard(page,title,desc,ico){
+  return `<div class="home-card" onclick="go('${page}')">
+    <div class="hc-ico">${ico}</div>
+    <h3>${title}</h3><p>${desc}</p>
+    <div class="hc-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+  </div>`;
+}
+
+function pageExec(){
+  return `
+  ${kpiRow()}
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Revenue & Profit Trend</div><div class="p-sub">Monthly performance</div></div><div class="p-ico">${ICONS.revenue.svg}</div></div><div class="chart-box tall" id="cExecTrend"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Revenue by Market</div><div class="p-sub">Share of total</div></div><div class="p-ico">${ICONS.aov.svg}</div></div><div class="chart-box tall" id="cExecMarket"></div></div>
+  </div>
+  <div class="grid grid-2-1">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Regions by Revenue</div><div class="p-sub">Global leaderboard</div></div></div><div class="chart-box tall" id="cExecRegion"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Delivery Risk</div><div class="p-sub">Late delivery rate</div></div></div><div class="chart-box" id="cExecLate"></div></div>
+  </div>`;
+}
+
+function pageFinance(){
+  return `
+  ${kpiRow()}
+  <div class="grid grid-3">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Category Revenue</div><div class="p-sub">Top 12 categories</div></div></div><div class="chart-box tall" id="cFinCat"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Profit by Category</div><div class="p-sub">Contribution</div></div></div><div class="chart-box tall" id="cFinCatProfit"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Discount Impact</div><div class="p-sub">Avg discount rate</div></div></div><div class="chart-box tall" id="cFinDiscount"></div></div>
+  </div>
+  <div class="panel">
+    <div class="p-head"><div><div class="p-title">Revenue Matrix — Market × Department</div><div class="p-sub">Conditional heat formatting · deepest green = highest value</div></div>
+      <div class="legend"><div class="lg"><span class="swatch" style="background:linear-gradient(90deg,#0a2a1d,#00e58c)"></span>Low → High</div></div>
+    </div>
+    <div class="matrix-wrap" id="cFinMatrix"></div>
+  </div>`;
+}
+
+function pageSales(){
+  return `
+  ${kpiRow()}
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Order Status Funnel</div><div class="p-sub">Orders by status</div></div></div><div class="chart-box tall" id="cSalesStatus"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Shipping Mode Mix</div><div class="p-sub">Orders and revenue</div></div></div><div class="chart-box tall" id="cSalesShip"></div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Regions</div><div class="p-sub">Revenue by region</div></div></div><div class="chart-box tall" id="cSalesRegion"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Segment Contribution</div><div class="p-sub">Revenue by customer segment</div></div></div><div class="chart-box tall" id="cSalesSeg"></div></div>
+  </div>`;
+}
+
+function pageCustomers(){
+  return `
+  <div class="kpi-grid">
+    ${kpiCard(ICONS.customers,'Total Customers',compactNum(DATA.kpi.customers),null)}
+    ${kpiCard(ICONS.revenue,'Consumer Revenue',compactMoney(SEGMENT.find(s=>s.segment==='Consumer')?.revenue||0),null)}
+    ${kpiCard(ICONS.orders,'Consumer Orders',compactNum(SEGMENT.find(s=>s.segment==='Consumer')?.orders||0),null)}
+    ${kpiCard(ICONS.aov,'Consumer AOV',compactMoney((SEGMENT.find(s=>s.segment==='Consumer')?.revenue||0)/(SEGMENT.find(s=>s.segment==='Consumer')?.orders||1)),null)}
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Segment Mix</div><div class="p-sub">Revenue by segment</div></div></div><div class="chart-box tall" id="cCustSeg"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Customer Cities</div><div class="p-sub">Revenue concentration</div></div></div><div class="chart-box tall" id="cCustCities"></div></div>
+  </div>
+  <div class="panel">
+    <div class="p-head"><div><div class="p-title">Segment Performance Table</div><div class="p-sub">Revenue, profit, orders and margin</div></div></div>
+    <div id="cCustTable"></div>
+  </div>`;
+}
+
+function pageDigital(){
+  return `
+  <div class="kpi-grid">
+    ${kpiCard(ICONS.views,'Total Views',compactNum(DATA.hourly.reduce((s,h)=>s+h.views,0)),null)}
+    ${kpiCard(ICONS.aov,'Peak Hour',HOURLY.slice().sort((a,b)=>b.views-a.views)[0].hr+':00',null)}
+    ${kpiCard(ICONS.orders,'Peak Views',compactNum(HOURLY.slice().sort((a,b)=>b.views-a.views)[0].views),null)}
+    ${kpiCard(ICONS.late,'Lowest Hour',HOURLY.slice().sort((a,b)=>a.views-b.views)[0].hr+':00',null)}
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Views by Hour of Day</div><div class="p-sub">24-hour engagement curve</div></div></div><div class="chart-box tall" id="cDigHour"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Monthly Page Views</div><div class="p-sub">Access log trend</div></div></div><div class="chart-box tall" id="cDigTrend"></div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Products by Views</div><div class="p-sub">Highest engagement</div></div></div><div class="chart-box tall" id="cDigTop"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Department Engagement</div><div class="p-sub">Views by department</div></div></div><div class="chart-box tall" id="cDigDept"></div></div>
+  </div>`;
+}
+
+function pageSupplychain(){
+  return `
+  <div class="kpi-grid">
+    ${kpiCard(ICONS.late,'Late Delivery Rate','54.8%',null,null,'glow')}
+    ${kpiCard(ICONS.orders,'Late Orders',compactNum(98977),null)}
+    ${kpiCard(ICONS.revenue,'On-Time Orders',compactNum(32196),null)}
+    ${kpiCard(ICONS.units,'Canceled Shipments',compactNum(7754),null)}
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Delivery Status</div><div class="p-sub">Order delivery outcomes</div></div></div><div class="chart-box tall" id="cScDelivery"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Late Risk by Shipping Mode</div><div class="p-sub">% of late deliveries</div></div></div><div class="chart-box tall" id="cScLate"></div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Shipping Revenue</div><div class="p-sub">Revenue by shipping mode</div></div></div><div class="chart-box tall" id="cScShipRev"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Logistics Health</div><div class="p-sub">Late share composition</div></div></div><div class="chart-box" id="cScHealth"></div></div>
+  </div>`;
+}
+
+function pageProduct(){
+  return `
+  <div class="kpi-grid">
+    ${kpiCard(ICONS.units,'Catalog Products','118',null)}
+    ${kpiCard(ICONS.aov,'Total Products','122',null)}
+    ${kpiCard(ICONS.orders,'Top Category','Fishing',null)}
+    ${kpiCard(ICONS.profit,'Top Product Rev','$6.93M',null)}
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Views vs Revenue</div><div class="p-sub">Top products · engagement to conversion</div></div></div><div class="chart-box tall" id="cProdScatter"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Category Revenue</div><div class="p-sub">Top 12</div></div></div><div class="chart-box tall" id="cProdCat"></div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Products by Views</div><div class="p-sub">Ranked leaderboard</div></div></div><div id="cProdRank"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Products by Revenue</div><div class="p-sub">Monetary contribution</div></div></div><div id="cProdRankRev"></div></div>
+  </div>`;
+}
+
+function pageGeo(){
+  return `
+  ${kpiRow()}
+  <div class="grid grid-2-1">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Revenue by Region</div><div class="p-sub">23 global regions</div></div></div><div class="chart-box tall" id="cGeoRegion"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Market Share</div><div class="p-sub">Revenue donut</div></div></div><div class="chart-box tall" id="cGeoMarket"></div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="panel"><div class="p-head"><div><div class="p-title">Top Cities</div><div class="p-sub">Customer concentration</div></div></div><div class="chart-box tall" id="cGeoCity"></div></div>
+    <div class="panel"><div class="p-head"><div><div class="p-title">Regional Orders</div><div class="p-sub">Order volume</div></div></div><div class="chart-box tall" id="cGeoOrders"></div></div>
+  </div>`;
+}
+
+/* ==========================================================================
+   NAVIGATION
+   ========================================================================== */
+function go(page){
+  state.page = page;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
+  document.getElementById('pageTitle').textContent = PAGES.title[page][0];
+  document.getElementById('pageSub').textContent = PAGES.title[page][1];
+  refreshAll();
+  const content = document.getElementById('content');
+  if(content) content.scrollTop = 0;
+}
+function renderPage(page){
+  switch(page){
+    case 'home': return pageHome();
+    case 'exec': return pageExec();
+    case 'finance': return pageFinance();
+    case 'sales': return pageSales();
+    case 'customers': return pageCustomers();
+    case 'digital': return pageDigital();
+    case 'supplychain': return pageSupplychain();
+    case 'product': return pageProduct();
+    case 'geo': return pageGeo();
+  }
+}
+function refreshAll(){
+  Object.keys(chartRegistry).forEach(id=>{ try{ chartRegistry[id].destroy(); }catch(e){} delete chartRegistry[id]; });
+  document.getElementById('content').innerHTML = renderPage(state.page);
+  buildSlicerChips();
+  switch(state.page){
+    case 'exec': renderExec(); break;
+    case 'finance': renderFinance(); break;
+    case 'sales': renderSales(); break;
+    case 'customers': renderCustomers(); break;
+    case 'digital': renderDigital(); break;
+    case 'supplychain': renderSupplychain(); break;
+    case 'product': renderProduct(); break;
+    case 'geo': renderGeo(); break;
+  }
+}
+
+/* ==========================================================================
+   CHART DATASET HELPERS
+   ========================================================================== */
+function aggBy(rows, key, field, sort){
+  const m = new Map();
+  rows.forEach(r=>{
+    const k = r[key];
+    if(!m.has(k)) m.set(k, 0);
+    m.set(k, m.get(k)+r[field]);
+  });
+  let arr = [...m.entries()].map(([label, value])=>({label, value}));
+  if(sort) arr.sort((a,b)=>b.value-a.value);
+  return arr;
+}
+function aggregateCube(key, field, sort){
+  return aggBy(cubeFiltered(), key, field, sort);
+}
+function hexA(hex, a){
+  const n = parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function compactNum(v){
+  const abs = Math.abs(v);
+  if(abs>=1e9) return (v/1e9).toFixed(1).replace(/\.0$/,'')+'B';
+  if(abs>=1e6) return (v/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+  if(abs>=1e3) return (v/1e3).toFixed(1).replace(/\.0$/,'')+'K';
+  return String(Math.round(v));
+}
+function compactMoney(v){
+  return '$'+compactNum(v);
+}
+
+/* ==========================================================================
+   PAGE RENDERING
+   ========================================================================== */
+function hBar(id, data, {label, color=GREEN, colorFn, suffix='', money=false}={}){
+  renderChart(id, baseChart({
+    type:'bar',
+    data:{ labels:data.map(d=>d.label), datasets:[{ label, data:data.map(d=>d.value), backgroundColor: colorFn? data.map((d,i)=>colorFn(d.value,i,data)) : (Array.isArray(color)?color:hexA(color,.85)), borderRadius:6, borderSkipped:false, maxBarThickness:22 }] },
+    options:{ indexAxis:'y', plugins:{ legend:{display:false}, datalabels:{display:false}, tooltip:{ callbacks:{ label:(c)=>`${label}: ${money?compactMoney(c.parsed.x):compactNum(c.parsed.x)}${suffix}` } } }, scales:{ x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5},callback:(v)=>money?compactMoney(v):compactNum(v)},border:{color:'#1c2629'}}, y:{grid:{display:false},ticks:{color:'#9fb4ab',font:{family:'Inter',size:11},autoSkip:false},border:{display:false}} } }
+  }));
+}
+function compactMoney(v){
+  if(Math.abs(v)>=1e6) return '$'+(v/1e6).toFixed(1)+'M';
+  if(Math.abs(v)>=1e3) return '$'+(v/1e3).toFixed(1)+'K';
+  return '$'+Math.round(v);
+}
+function vBar(id, data, {label, color=GREEN, money=false}={}){
+  renderChart(id, baseChart({
+    type:'bar',
+    data:{ labels:data.map(d=>d.label), datasets:[{ label, data:data.map(d=>d.value), backgroundColor:hexA(color,.85), borderRadius:6, borderSkipped:false, maxBarThickness:26 }] },
+    options:{ plugins:{ legend:{display:false}, datalabels:{display:false}, tooltip:{ callbacks:{ label:(c)=>`${label}: ${money?compactMoney(c.parsed.y):compactNum(c.parsed.y)}` } } }, scales:{ x:{grid:{display:false},ticks:{color:'#9fb4ab',font:{family:'Inter',size:10.5}},border:{display:false}}, y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5},callback:(v)=>money?compactMoney(v):compactNum(v)},border:{display:false}} } }
+  }));
+}
+function lineChart(id, data, {series=[], labels, money=false}={}){
+  renderChart(id, baseChart({
+    type:'line',
+    data:{ labels, datasets:series.map((s,i)=>({ label:s.label, data:s.data, borderColor:s.color, backgroundColor:hexA(s.color,.12), fill:s.fill!==false, tension:.35, borderWidth:2.4, pointRadius:0, pointHoverRadius:4, pointBackgroundColor:s.color, _money:s.money??money })) },
+    options:{ interaction:{mode:'index',intersect:false}, plugins:{ legend:{labels:{color:'#9fb4ab',font:{family:'Inter',size:11,weight:'600'},usePointStyle:true,boxWidth:7}}, datalabels:{display:false}, tooltip:{ callbacks:{ label:(c)=>`${c.dataset.label}: ${c.dataset._money?compactMoney(c.parsed.y):compactNum(c.parsed.y)}` } } }, scales:{ x:{grid:{display:false},ticks:{color:'#9fb4ab',font:{family:'Inter',size:10.5}},border:{display:false}}, y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5},callback:(v)=>money?compactMoney(v):compactNum(v)},border:{display:false}}} }
+  }));
+}
+function doughnut(id, data, {centerText, money=true}={}){
+  renderChart(id, baseChart({
+    type:'doughnut',
+    data:{ labels:data.map(d=>d.label), datasets:[{ data:data.map(d=>d.value), backgroundColor:data.map((d,i)=>PALETTE[i%PALETTE.length]), borderColor:'#0a1214', borderWidth:3, hoverOffset:6 }] },
+    options:{ cutout:'62%', plugins:{ legend:{position:'bottom',labels:{color:'#9fb4ab',font:{family:'Inter',size:11,weight:'600'},usePointStyle:true,boxWidth:7,padding:14}}, datalabels:{display:false}, tooltip:{ callbacks:{ label:(c)=>`${c.label}: ${money?compactMoney(c.parsed):compactNum(c.parsed)}` } } }, scales:{} }
+  }));
+}
+function gauge(id, pct, color, label){
+  renderChart(id, baseChart({
+    type:'doughnut',
+    data:{ labels:['', ''], datasets:[{ data:[pct, 100-pct], backgroundColor:[color, 'rgba(255,255,255,.06)'], borderColor:'#0a1214', borderWidth:2, borderRadius:0 }] },
+    options:{ rotation:270, circumference:180, cutout:'68%', plugins:{ legend:{display:false}, tooltip:{enabled:false} }, scales:{} },
+    plugins:[{
+      id:'gaugeCenter',
+      afterDraw(chart){
+        const {ctx, chartArea} = chart;
+        if(!chartArea) return;
+        const x = (chartArea.left+chartArea.right)/2;
+        const y = chartArea.bottom;
+        ctx.save();
+        ctx.textAlign='center'; ctx.textBaseline='bottom';
+        ctx.font="800 26px Inter";
+        ctx.fillStyle='#fff';
+        ctx.fillText(pct.toFixed(1)+'%', x, y-4);
+        ctx.font="600 11px Inter"; ctx.fillStyle='#64776f';
+        ctx.fillText(label||'', x, y+14);
+        ctx.restore();
+      }
+    }]
+  }));
+}
+
+/* ==========================================================================
+   EXECUTIVE PAGE
+   ========================================================================== */
+function renderExec(){
+  const trend = DATA.trend;
+  const labels = trend.map(t=>MONTHS[t.mo-1]+" '"+(t.year%100));
+  lineChart('cExecTrend', null, { labels, money:true, series:[
+    { label:'Revenue', data:trend.map(t=>t.revenue), color:GREEN },
+    { label:'Profit', data:trend.map(t=>t.profit), color:PURPLE, fill:false }
+  ]});
+  const mk = aggregateCube('market','revenue',true);
+  if(mk.length) doughnut('cExecMarket', mk.map(d=>({label:d.label, value:d.value})));
+  else doughnut('cExecMarket', [{label:'No data', value:1}]);
+  const reg = DATA.region.slice().sort((a,b)=>b.revenue-a.revenue).slice(0,12);
+  hBar('cExecRegion', reg.map(r=>({label:r.region, value:r.revenue})), {label:'Revenue', money:true, colorFn:(v)=>hexA(GREEN, .45+.55*(v/reg[0].revenue))});
+  gauge('cExecLate', DATA.kpi.late_pct, RED, 'Late delivery rate');
+}
+
+/* ==========================================================================
+   FINANCE PAGE
+   ========================================================================== */
+function renderFinance(){
+  const cat = DATA.category.slice().sort((a,b)=>b.revenue-a.revenue);
+  hBar('cFinCat', cat.map(c=>({label:c.category_name, value:c.revenue})), {label:'Revenue', money:true, colorFn:(v)=>hexA(GREEN, .4+.6*(v/cat[0].revenue))});
+  hBar('cFinCatProfit', cat.slice().sort((a,b)=>b.profit-a.profit).map(c=>({label:c.category_name, value:c.profit})), {label:'Profit', money:true, color:PURPLE});
+  const disc = cat.map(c=>({label:c.category_name, value: Math.round(c.profit/c.revenue*1000)/10}));
+  hBar('cFinDiscount', disc, {label:'Margin %', color:AMBER, suffix:'%'});
+  renderMatrix();
+}
+
+function renderMatrix(){
+  const el = document.getElementById('cFinMatrix'); if(!el) return;
+  const markets = [...new Set(DATA.matrix.map(m=>m.market))].sort();
+  const depts = [...new Set(DATA.matrix.map(m=>m.dept))].sort();
+  const all = DATA.matrix;
+  const max = Math.max(...all.map(m=>m.revenue));
+  let html = `<table class="matrix-table"><thead><tr><th>Market</th>${depts.map(d=>`<th>${esc(d)}</th>`).join('')}</tr></thead><tbody>`;
+  markets.forEach(mk=>{
+    html += `<tr><td class="dim">${esc(mk)}</td>`;
+    depts.forEach(dp=>{
+      const cell = all.find(x=>x.market===mk && x.dept===dp);
+      if(!cell){ html += `<td class="num mt-cell" style="background:rgba(0,0,0,.12);color:var(--txt3)">—</td>`; return; }
+      const a = Math.max(.05, .9*(cell.revenue/max));
+      html += `<td class="num mt-cell" style="background:rgba(0,229,140,${a.toFixed(2)});color:${a>.55?'#04150d':'#9fe8c8'}">${compactMoney(cell.revenue)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+/* ==========================================================================
+   SALES PAGE
+   ========================================================================== */
+function renderSales(){
+  const st = DATA.orderstatus.slice().sort((a,b)=>b.orders-a.orders);
+  hBar('cSalesStatus', st.map(s=>({label:s.order_status.replace(/_/g,' '), value:s.orders})), {label:'Orders', colorFn:(v,i)=>[GREEN,BLUE,PURPLE,AMBER,RED][i%5]});
+  const sh = DATA.shipping.slice().sort((a,b)=>b.revenue-a.revenue);
+  vBar('cSalesShip', sh.map(s=>({label:s.shipping_mode, value:s.revenue})), {label:'Revenue', money:true, color:BLUE});
+  const reg = DATA.region.slice().sort((a,b)=>b.revenue-a.revenue).slice(0,12);
+  hBar('cSalesRegion', reg.map(r=>({label:r.region, value:r.revenue})), {label:'Revenue', money:true, color:GREEN});
+  const seg = aggregateCube('seg','revenue',true);
+  if(seg.length) vBar('cSalesSeg', seg.map(s=>({label:s.label, value:s.value})), {label:'Revenue', money:true, color:PURPLE});
+  else vBar('cSalesSeg', [{label:'No data', value:0}], {label:'Revenue', money:true, color:PURPLE});
+}
+
+/* ==========================================================================
+   CUSTOMERS PAGE
+   ========================================================================== */
+function renderCustomers(){
+  const seg = DATA.segment.slice().sort((a,b)=>b.revenue-a.revenue);
+  doughnut('cCustSeg', seg.map(s=>({label:s.segment, value:s.revenue})));
+  const cities = DATA.cities.slice().slice(0,10);
+  hBar('cCustCities', cities.map(c=>({label:c.city, value:c.revenue})), {label:'Revenue', money:true, color:GREEN});
+  const el = document.getElementById('cCustTable'); if(!el) return;
+  const tot = seg.reduce((s,x)=>s+x.revenue,0);
+  el.innerHTML = `<table class="data-table"><thead><tr><th>Segment</th><th class="num">Customers</th><th class="num">Orders</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th></tr></thead><tbody>`+
+    seg.map(s=>`<tr><td>${esc(s.segment)}</td><td class="num">${compactNum(s.customers)}</td><td class="num">${compactNum(s.orders)}</td><td class="num" style="color:var(--green2)">${compactMoney(s.revenue)}</td><td class="num">${compactMoney(s.profit)}</td><td class="num">${(s.profit/s.revenue*100).toFixed(1)}%</td></tr>`).join('')+
+    `</tbody></table>`;
+}
+
+/* ==========================================================================
+   DIGITAL PAGE
+   ========================================================================== */
+function renderDigital(){
+  vBar('cDigHour', DATA.hourly.map(h=>({label: String(h.hr).padStart(2,'0')+':00', value:h.views})), {label:'Views', color:GREEN});
+  lineChart('cDigTrend', null, { labels: DATA.logtrend.map(t=>t.mn+" '"+t.yr%100), series:[{ label:'Views', data:DATA.logtrend.map(t=>t.views), color:GREEN }] });
+  const top = DATA.topviews.slice().slice(0,10);
+  hBar('cDigTop', top.map(t=>({label:t.product.length>28?t.product.slice(0,27)+'…':t.product, value:t.views})), {label:'Views', color:BLUE});
+  hBar('cDigDept', DATA.deptviews.map(d=>({label:d.dept, value:d.views})), {label:'Views', color:PURPLE});
+}
+
+/* ==========================================================================
+   SUPPLY CHAIN PAGE
+   ========================================================================== */
+function renderSupplychain(){
+  doughnut('cScDelivery', DATA.delivery.map(d=>({label:d.delivery_status, value:d.orders})));
+  const sh = DATA.shipping.slice().sort((a,b)=>b.late_pct-a.late_pct);
+  hBar('cScLate', sh.map(s=>({label:s.shipping_mode, value:+s.late_pct.toFixed(1)})), {label:'Late %', color:RED, suffix:'%'});
+  vBar('cScShipRev', DATA.shipping.slice().sort((a,b)=>b.revenue-a.revenue).map(s=>({label:s.shipping_mode, value:s.revenue})), {label:'Revenue', money:true, color:AMBER});
+  doughnut('cScHealth', sh.map(s=>({label:s.shipping_mode, value:s.late_orders})));
+}
+
+/* ==========================================================================
+   PRODUCT PAGE
+   ========================================================================== */
+function renderProduct(){
+  const pts = DATA.topviews.filter(t=>t.revenue>0).slice(0,12);
+  renderChart('cProdScatter', baseChart({
+    type:'scatter',
+    data:{ datasets:[{ label:'Product', data:pts.map(p=>({x:p.views, y:p.revenue})), backgroundColor:hexA(GREEN,.8), pointRadius:6, pointHoverRadius:8 }] },
+    options:{ plugins:{ legend:{display:false}, datalabels:{display:false}, tooltip:{ callbacks:{ title:(c)=>pts[c[0].dataIndex].product, label:(c)=>[`Views: ${compactNum(c.parsed.x)}`,`Revenue: ${compactMoney(c.parsed.y)}`] } } }, scales:{ x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5}},border:{color:'#1c2629'},title:{display:true,text:'Product Views',color:'#64776f',font:{family:'Inter',size:10.5}}}, y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64776f',font:{family:'Inter',size:10.5},callback:(v)=>compactMoney(v)},border:{color:'#1c2629'},title:{display:true,text:'Revenue',color:'#64776f',font:{family:'Inter',size:10.5}}} } }
+  }));
+  const cat = DATA.category.slice().sort((a,b)=>b.revenue-a.revenue);
+  hBar('cProdCat', cat.map(c=>({label:c.category_name, value:c.revenue})), {label:'Revenue', money:true, color:BLUE});
+  renderRank('cProdRank', DATA.topviews.slice().slice(0,10).map(t=>({name:t.product, sub:'Views', val:t.views})), false);
+  const rev = DATA.topviews.filter(t=>t.revenue>0).slice().sort((a,b)=>b.revenue-a.revenue).slice(0,10);
+  renderRank('cProdRankRev', rev.map(t=>({name:t.product, sub:'Revenue', val:t.revenue})), true);
+}
+function renderRank(id, items, money){
+  const el = document.getElementById(id); if(!el) return;
+  const max = items[0]?items[0].val:1;
+  el.innerHTML = `<div class="rank-list">`+items.map((it,i)=>`
+    <div class="rank-item">
+      <div class="rank-no">${i+1}</div>
+      <div class="rank-meta">
+        <div class="rank-name">${esc(it.name)}</div>
+        <div class="rank-bar" style="width:${Math.max(8,(it.val/max)*100).toFixed(1)}%"></div>
+      </div>
+      <div class="rank-val">${money?compactMoney(it.val):compactNum(it.val)}</div>
+    </div>`).join('')+`</div>`;
+}
+
+/* ==========================================================================
+   GEO PAGE
+   ========================================================================== */
+function renderGeo(){
+  const reg = DATA.region.slice().sort((a,b)=>b.revenue-a.revenue).slice(0,12);
+  hBar('cGeoRegion', reg.map(r=>({label:r.region, value:r.revenue})), {label:'Revenue', money:true, color:GREEN});
+  const mk = DATA.market.slice().sort((a,b)=>b.revenue-a.revenue);
+  doughnut('cGeoMarket', mk.map(m=>({label:m.market, value:m.revenue})));
+  const cities = DATA.cities.slice().slice(0,10);
+  hBar('cGeoCity', cities.map(c=>({label:c.city, value:c.revenue})), {label:'Revenue', money:true, color:BLUE});
+  hBar('cGeoOrders', DATA.region.slice().sort((a,b)=>b.orders-a.orders).slice(0,12).map(r=>({label:r.region, value:r.orders})), {label:'Orders', color:AMBER});
+}
+
+/* ==========================================================================
+   TOPBAR: CLOCK / LOGIN / BOOKMARKS
+   ========================================================================== */
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clockTime').textContent = d.toLocaleTimeString('en-US',{hour12:false});
+    document.getElementById('clockDate').textContent = d.toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'});
+  }
+  tick(); setInterval(tick, 1000);
+}
+function initTopbar(){
+  const loginBtn = document.getElementById('loginBtn');
+  const loginDd = document.getElementById('loginDropdown');
+  const bookmarkBtn = document.getElementById('bookmarkBtn');
+  const bookmarkDd = document.getElementById('bookmarkDropdown');
+  document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>go(n.dataset.page)));
+  loginBtn.addEventListener('click',(e)=>{ e.stopPropagation(); loginDd.classList.toggle('open'); bookmarkDd.classList.remove('open'); });
+  bookmarkBtn.addEventListener('click',(e)=>{ e.stopPropagation(); bookmarkDd.classList.toggle('open'); loginDd.classList.remove('open'); });
+  document.addEventListener('click',(e)=>{ if(!e.target.closest('.dropdown')){ loginDd.classList.remove('open'); bookmarkDd.classList.remove('open'); } });
+  loginDd.querySelectorAll('.dd-item').forEach(it=>it.addEventListener('click',()=>{
+    const role = it.dataset.role;
+    loginDd.classList.remove('open');
+    if(role==='none'){ state.role=null; document.getElementById('loginLabel').textContent='Sign In'; return; }
+    state.role = role;
+    document.getElementById('loginLabel').textContent = role;
+    const target = PAGES.byRole[role];
+    if(target && state.page==='home') go(target);
+  }));
+  bookmarkBtn.addEventListener('click',()=>{
+    if(state.bookmarks.has(state.page)){
+      state.bookmarks.delete(state.page);
+      document.getElementById('bookmarkLabel').textContent='Bookmark';
+    } else {
+      state.bookmarks.add(state.page);
+      document.getElementById('bookmarkLabel').textContent='Saved';
+    }
+    renderBookmarks();
+  });
+  document.getElementById('btnClearSlicers').addEventListener('click', clearAllSlicers);
+}
+function renderBookmarks(){
+  const list = document.getElementById('bookmarkList');
+  if(!list) return;
+  if(!state.bookmarks.size){ list.innerHTML = `<div class="empty-note">No bookmarks yet — click Bookmark to save a page.</div>`; return; }
+  list.innerHTML = [...state.bookmarks].map(p=>`
+    <div class="dd-item" data-goto="${p}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>
+      ${PAGES.title[p][0]}
+    </div>`).join('');
+  list.querySelectorAll('.dd-item').forEach(it=>it.addEventListener('click',()=>{
+    go(it.dataset.goto);
+    document.getElementById('bookmarkDropdown').classList.remove('open');
+  }));
+}
+
+/* ==========================================================================
+   INIT
+   ========================================================================== */
+document.addEventListener('DOMContentLoaded', function(){
+  if(window.ChartDataLabels){
+    Chart.register(window.ChartDataLabels);
+    Chart.defaults.plugins.datalabels.display = false;
+  }
+  startClock();
+  initTopbar();
+  renderBookmarks();
+  go('home');
+});
+
+</script>
+</body>
+</html>
