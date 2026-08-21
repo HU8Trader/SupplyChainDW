@@ -1,6 +1,6 @@
 # SupplyChainDW — Supply Chain Data Warehouse
 
-An end-to-end, GitHub-ready SQL Server data warehouse project built with the **medallion architecture** (Bronze → Silver → Gold) and a fully interactive, self-contained HTML dashboard on top of the Gold layer.
+An end-to-end,SQL Server data warehouse project built with the **medallion architecture** (Bronze → Silver → Gold) and a fully interactive, self-contained HTML dashboard on top of the Gold layer.
 
 Built on SQL Server 2025 (17.x) Enterprise Developer Edition, following the conventions of the `HUDataWareHouseProjectSQLScripts` reference project.
 
